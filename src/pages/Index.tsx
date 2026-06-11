@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthScreen from "@/components/vainakh/AuthScreen";
 import RegisterScreen from "@/components/vainakh/RegisterScreen";
 import MainApp from "@/components/vainakh/MainApp";
+import Icon from "@/components/ui/icon";
 
 export type AppScreen = "auth" | "register" | "app";
 
@@ -18,20 +19,35 @@ export interface User {
 }
 
 const defaultUser: User = {
-  email: "user@example.com",
-  name: "Ахмед",
-  surname: "Мусаев",
-  city: "Грозный",
-  phone: "+7 928 123-45-67",
-  birthdate: "1998-05-14",
+  email: "",
+  name: "",
+  surname: "",
+  city: "",
+  phone: "",
+  birthdate: "",
   about: "Привет! Я использую ВайНах 👋",
   avatar: "",
   online: true,
 };
 
+export type Theme = "dark" | "light";
+
 export default function Index() {
   const [screen, setScreen] = useState<AppScreen>("auth");
   const [user, setUser] = useState<User>(defaultUser);
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [loginEmail, setLoginEmail] = useState("");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "light") {
+      root.classList.add("theme-light");
+    } else {
+      root.classList.remove("theme-light");
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   return (
     <div
@@ -44,25 +60,79 @@ export default function Index() {
         background: "var(--vn-bg)",
         display: "flex",
         flexDirection: "column",
+        transition: "background 0.3s",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          overflow: "hidden",
-          zIndex: 0,
-        }}
-      >
-        <div style={{ position: "absolute", top: -100, right: -80, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,107,53,0.12) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", bottom: 100, left: -100, width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(155,89,182,0.1) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", top: "40%", left: "40%", width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,63,212,0.08) 0%, transparent 70%)" }} />
+      {/* Ambient orbs */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
+        <div style={{ position: "absolute", top: -120, right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(33,150,243,0.12) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", bottom: 80, left: -120, width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(21,101,192,0.1) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", top: "35%", left: "30%", width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.07) 0%, transparent 70%)" }} />
+      </div>
+
+      {/* Theme switcher — top right */}
+      <div style={{ position: "absolute", top: 14, right: 14, zIndex: 100 }}>
+        <button
+          onClick={toggleTheme}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "var(--vn-card2)",
+            border: "1px solid var(--vn-border)",
+            borderRadius: "50px",
+            padding: "0.35rem 0.7rem",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <span style={{ fontSize: "0.9rem" }}>{theme === "dark" ? "🌙" : "☀️"}</span>
+          <div
+            style={{
+              width: 32,
+              height: 17,
+              borderRadius: 9,
+              background: theme === "dark" ? "var(--vn-blue-light)" : "var(--vn-blue-bright)",
+              position: "relative",
+              transition: "background 0.25s",
+            }}
+          >
+            <div
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: "50%",
+                background: "white",
+                position: "absolute",
+                top: 2,
+                left: theme === "dark" ? 2 : 17,
+                transition: "left 0.25s",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+              }}
+            />
+          </div>
+        </button>
       </div>
 
       <div style={{ position: "relative", zIndex: 1, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {screen === "auth" && <AuthScreen onLogin={() => setScreen("register")} />}
-        {screen === "register" && <RegisterScreen onContinue={() => setScreen("app")} user={user} setUser={setUser} />}
+        {screen === "auth" && (
+          <AuthScreen
+            onLogin={(email) => {
+              setLoginEmail(email);
+              setUser((u) => ({ ...u, email }));
+              setScreen("register");
+            }}
+          />
+        )}
+        {screen === "register" && (
+          <RegisterScreen
+            onContinue={() => setScreen("app")}
+            user={user}
+            setUser={setUser}
+            email={loginEmail}
+          />
+        )}
         {screen === "app" && <MainApp user={user} setUser={setUser} />}
       </div>
     </div>

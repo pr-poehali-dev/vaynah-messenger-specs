@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
+import CallScreen from "./CallScreen";
 
 interface Message {
   id: number;
@@ -16,27 +17,29 @@ const initialMessages: Message[] = [
   { id: 1, text: "Ассаламу алейкум! 🙏", mine: false, time: "14:20", type: "text" },
   { id: 2, text: "Ваалейкум Ассалам! Как дела?", mine: true, time: "14:21", type: "text" },
   { id: 3, text: "Всё отлично, готовлюсь к поездке", mine: false, time: "14:22", type: "text" },
-  { id: 4, text: "🎙 Голосовое 0:24", mine: false, time: "14:23", type: "voice" },
+  { id: 4, text: "", mine: false, time: "14:23", type: "voice" },
   { id: 5, text: "Хорошо! Увидимся завтра 👋", mine: true, time: "14:32", type: "text", readBy: ["Зайнаб"] },
 ];
 
-interface Chat {
+const avatarColors = [
+  "linear-gradient(135deg, #1565C0, #2196F3)",
+  "linear-gradient(135deg, #1976D2, #42A5F5)",
+];
+
+export interface ChatData {
   id: number;
   name: string;
   avatar: string;
   online: boolean;
+  city?: string;
+  age?: number;
 }
 
 interface Props {
-  chat: Chat;
+  chat: ChatData;
   user: User;
   onBack: () => void;
 }
-
-const avatarColors = [
-  "linear-gradient(135deg, #FF6B35, #E91E8C)",
-  "linear-gradient(135deg, #5B3FD4, #9B59B6)",
-];
 
 export default function ChatView({ chat, user, onBack }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -45,7 +48,12 @@ export default function ChatView({ chat, user, onBack }: Props) {
   const [showReadBy, setShowReadBy] = useState<number | null>(null);
   const [showMedia, setShowMedia] = useState(false);
   const [activeMediaTab, setActiveMediaTab] = useState("Фото");
+  const [call, setCall] = useState<"audio" | "video" | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,49 +83,208 @@ export default function ChatView({ chat, user, onBack }: Props) {
 
   const mediaTabs = ["Фото", "Видео", "Голосовые", "Кружки", "Ссылки", "Файлы", "Документы"];
 
+  // --- CALL SCREEN ---
+  if (call) {
+    return (
+      <div style={{ position: "relative", height: "100%" }}>
+        <CallScreen
+          type={call}
+          name={chat.name}
+          avatar={chat.avatar}
+          onEnd={() => setCall(null)}
+        />
+      </div>
+    );
+  }
+
+  // --- PROFILE VIEW ---
+  if (showProfile) {
+    return (
+      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "0.9rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
+          <button onClick={() => setShowProfile(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
+            <Icon name="ArrowLeft" size={22} />
+          </button>
+          <span style={{ fontWeight: 600 }}>Профиль</span>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
+          {/* Cover */}
+          <div style={{ height: 130, background: "linear-gradient(135deg, var(--vn-blue) 0%, var(--vn-blue-light) 60%, var(--vn-blue-bright) 100%)", position: "relative" }}>
+            <div style={{ position: "absolute", inset: 0, background: "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'><circle cx='160' cy='30' r='60' fill='rgba(255,255,255,0.05)'/><circle cx='30' cy='80' r='40' fill='rgba(255,255,255,0.04)'/></svg>\")" }} />
+          </div>
+          <div style={{ padding: "0 1.2rem 1.2rem", position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+              <div
+                style={{
+                  marginTop: -44,
+                  width: 88,
+                  height: 88,
+                  borderRadius: "50%",
+                  background: avatarColors[0],
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 800,
+                  fontSize: "2rem",
+                  color: "white",
+                  border: "4px solid var(--vn-bg)",
+                  position: "relative",
+                }}
+              >
+                {chat.avatar}
+                {chat.online && <div className="vn-online" style={{ position: "absolute", bottom: 4, right: 4, width: 14, height: 14 }} />}
+              </div>
+            </div>
+            <h2 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.4rem", marginBottom: 4 }}>{chat.name}</h2>
+            <p style={{ color: "var(--vn-muted)", fontSize: "0.84rem", marginBottom: "1rem" }}>
+              {chat.online ? "🟢 онлайн" : "⚫ был(а) недавно"}
+              {chat.city && ` · ${chat.city}`}
+              {chat.age && ` · ${chat.age} лет`}
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem", marginBottom: "1rem" }}>
+              <button
+                onClick={() => { setShowProfile(false); setCall("audio"); }}
+                className="vn-btn"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0.75rem", fontSize: "0.9rem" }}
+              >
+                <Icon name="Phone" size={16} color="white" />
+                Позвонить
+              </button>
+              <button
+                onClick={() => { setShowProfile(false); setCall("video"); }}
+                className="vn-btn"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0.75rem", fontSize: "0.9rem", background: "linear-gradient(135deg, var(--vn-blue-mid), var(--vn-blue-bright))" }}
+              >
+                <Icon name="Video" size={16} color="white" />
+                Видео
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowProfile(false)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.75rem", color: "var(--vn-text)", cursor: "pointer", fontSize: "0.9rem", marginBottom: "0.65rem" }}
+            >
+              <Icon name="MessageCircle" size={16} color="var(--vn-blue-bright)" />
+              Написать
+            </button>
+
+            <button
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.25)", borderRadius: "0.75rem", padding: "0.75rem", color: "#E74C3C", cursor: "pointer", fontSize: "0.9rem" }}
+            >
+              <Icon name="Ban" size={16} color="#E74C3C" />
+              Заблокировать
+            </button>
+          </div>
+
+          {/* Photo grid */}
+          <div style={{ padding: "0 1.2rem 1.5rem" }}>
+            <p style={{ fontSize: "0.78rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.6rem" }}>Фото</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} style={{ aspectRatio: "1", borderRadius: "0.5rem", background: `linear-gradient(135deg, rgba(21,101,192,${0.3 + i * 0.05}), rgba(33,150,243,${0.2 + i * 0.05}))`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon name="Image" size={18} color="rgba(255,255,255,0.25)" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- CAMERA SCREEN ---
+  if (cameraOpen) {
+    return (
+      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", background: "#000", position: "relative" }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0A" }}>
+          <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)" }}>
+            <Icon name="Camera" size={60} color="rgba(255,255,255,0.15)" />
+            <p style={{ marginTop: "1rem", fontSize: "0.9rem" }}>Камера недоступна в браузере</p>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", padding: "1.5rem 2rem", background: "rgba(0,0,0,0.8)" }}>
+          <button onClick={() => setCameraOpen(false)} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <Icon name="X" size={22} color="white" />
+          </button>
+          <button
+            onClick={() => {
+              setCameraOpen(false);
+              setMessages((prev) => [...prev, { id: Date.now(), text: "📸 Фото", mine: true, time: new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }), type: "image" }]);
+            }}
+            style={{ width: 68, height: 68, borderRadius: "50%", background: "white", border: "4px solid rgba(255,255,255,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, var(--vn-blue), var(--vn-blue-light))" }} />
+          </button>
+          <div style={{ width: 48 }} />
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN CHAT ---
   return (
-    <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", position: "relative" }}>
       {/* Header */}
-      <div style={{ padding: "0.9rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: "0.8rem", background: "var(--vn-card)" }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-orange)", padding: 4 }}>
+      <div style={{ padding: "0.85rem 0.9rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: "0.7rem", background: "var(--vn-card)" }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)", padding: 4, flexShrink: 0 }}>
           <Icon name="ArrowLeft" size={22} />
         </button>
-        <div style={{ position: "relative" }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: avatarColors[0], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white" }}>
+
+        {/* Clickable avatar → profile */}
+        <button
+          onClick={() => setShowProfile(true)}
+          style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
+        >
+          <div style={{ width: 42, height: 42, borderRadius: "50%", background: avatarColors[0], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem" }}>
             {chat.avatar}
           </div>
           {chat.online && <div className="vn-online" style={{ position: "absolute", bottom: 0, right: 0 }} />}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{chat.name}</div>
-          <div style={{ fontSize: "0.75rem", color: chat.online ? "#2ECC71" : "var(--vn-muted)" }}>
+        </button>
+
+        {/* Name → profile */}
+        <button
+          onClick={() => setShowProfile(true)}
+          style={{ flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}
+        >
+          <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--vn-text)" }}>{chat.name}</div>
+          <div style={{ fontSize: "0.72rem", color: chat.online ? "#2ECC71" : "var(--vn-muted)" }}>
             {chat.online ? "онлайн" : "был(а) недавно"}
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        </button>
+
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           <button
-            style={{ background: "rgba(255,107,53,0.1)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            onClick={() => setCall("audio")}
+            style={{ background: "rgba(33,150,243,0.12)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { (e.currentTarget.style.background = "rgba(33,150,243,0.25)"); }}
+            onMouseLeave={(e) => { (e.currentTarget.style.background = "rgba(33,150,243,0.12)"); }}
           >
-            <Icon name="Phone" size={17} color="var(--vn-orange)" />
+            <Icon name="Phone" size={17} color="var(--vn-blue-bright)" />
           </button>
           <button
-            style={{ background: "rgba(255,107,53,0.1)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            onClick={() => setCall("video")}
+            style={{ background: "rgba(33,150,243,0.12)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { (e.currentTarget.style.background = "rgba(33,150,243,0.25)"); }}
+            onMouseLeave={(e) => { (e.currentTarget.style.background = "rgba(33,150,243,0.12)"); }}
           >
-            <Icon name="Video" size={17} color="var(--vn-orange)" />
+            <Icon name="Video" size={17} color="var(--vn-blue-bright)" />
           </button>
           <button
             onClick={() => setShowMedia(true)}
-            style={{ background: "rgba(255,107,53,0.1)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            style={{ background: "rgba(33,150,243,0.12)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { (e.currentTarget.style.background = "rgba(33,150,243,0.25)"); }}
+            onMouseLeave={(e) => { (e.currentTarget.style.background = "rgba(33,150,243,0.12)"); }}
           >
-            <Icon name="Image" size={17} color="var(--vn-orange)" />
+            <Icon name="Image" size={17} color="var(--vn-blue-bright)" />
           </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }} className="scrollbar-hide">
+      <div style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.7rem" }} className="scrollbar-hide">
         {messages.map((msg) => (
-          <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.mine ? "flex-end" : "flex-start", gap: 2 }}>
+          <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.mine ? "flex-end" : "flex-start", gap: 3 }}>
             <div
               className={msg.mine ? "vn-msg-me" : "vn-msg-other"}
               onClick={() => setShowReadBy(showReadBy === msg.id ? null : msg.id)}
@@ -125,43 +292,51 @@ export default function ChatView({ chat, user, onBack }: Props) {
               style={{ cursor: "pointer", position: "relative" }}
             >
               {msg.type === "voice" ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Icon name="Mic" size={14} color={msg.mine ? "rgba(255,255,255,0.9)" : "var(--vn-orange)"} />
-                  <div style={{ width: 80, height: 3, borderRadius: 2, background: msg.mine ? "rgba(255,255,255,0.4)" : "var(--vn-border)" }}>
-                    <div style={{ width: "60%", height: "100%", borderRadius: 2, background: msg.mine ? "white" : "var(--vn-orange)" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 120 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: msg.mine ? "rgba(255,255,255,0.2)" : "rgba(33,150,243,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="Play" size={12} color={msg.mine ? "white" : "var(--vn-blue-bright)"} />
                   </div>
-                  <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>0:24</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ height: 3, borderRadius: 2, background: msg.mine ? "rgba(255,255,255,0.3)" : "var(--vn-border)", marginBottom: 3 }}>
+                      <div style={{ width: "55%", height: "100%", borderRadius: 2, background: msg.mine ? "white" : "var(--vn-blue-light)" }} />
+                    </div>
+                    <span style={{ fontSize: "0.7rem", opacity: 0.7 }}>0:24</span>
+                  </div>
+                </div>
+              ) : msg.type === "image" ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="Image" size={16} color={msg.mine ? "rgba(255,255,255,0.8)" : "var(--vn-blue-bright)"} />
+                  <span>Фото</span>
                 </div>
               ) : (
                 msg.text
               )}
               {msg.reaction && (
-                <span style={{ position: "absolute", bottom: -10, right: msg.mine ? 4 : "auto", left: msg.mine ? "auto" : 4, fontSize: "1rem" }}>
+                <span style={{ position: "absolute", bottom: -12, right: msg.mine ? 4 : "auto", left: msg.mine ? "auto" : 4, fontSize: "1rem", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}>
                   {msg.reaction}
                 </span>
               )}
             </div>
+
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: "0.7rem", color: "var(--vn-muted)" }}>{msg.time}</span>
-              {msg.mine && msg.readBy && (
-                <Icon name="CheckCheck" size={12} color="var(--vn-orange)" />
-              )}
+              <span style={{ fontSize: "0.68rem", color: "var(--vn-muted)" }}>{msg.time}</span>
+              {msg.mine && msg.readBy && <Icon name="CheckCheck" size={12} color="var(--vn-blue-bright)" />}
             </div>
 
             {showReadBy === msg.id && msg.readBy && (
-              <div style={{ background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.6rem", padding: "0.5rem 0.75rem", fontSize: "0.78rem", color: "var(--vn-muted)", animation: "vn-appear 0.15s ease" }}>
+              <div style={{ background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.6rem", padding: "0.45rem 0.75rem", fontSize: "0.76rem", color: "var(--vn-muted)", animation: "vn-appear 0.15s ease" }}>
                 👁 Прочитал(а): {msg.readBy.join(", ")}
               </div>
             )}
 
             {showReaction === msg.id && (
-              <div style={{ display: "flex", gap: 6, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "2rem", padding: "0.4rem 0.8rem", animation: "vn-appear 0.15s ease" }}>
-                {["❤️", "😂", "👍", "😮", "😢", "🔥"].map((em) => (
+              <div style={{ display: "flex", gap: 5, background: "var(--vn-card)", border: "1px solid var(--vn-border)", borderRadius: "2rem", padding: "0.4rem 0.75rem", animation: "vn-appear 0.15s ease", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
+                {["❤️", "😂", "👍", "😮", "😢", "🔥", "🙏"].map((em) => (
                   <button
                     key={em}
                     onClick={() => addReaction(msg.id, em)}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", padding: 2, borderRadius: "50%", transition: "transform 0.1s" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.3)")}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", padding: "2px", borderRadius: "50%", transition: "transform 0.1s" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.35)")}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                   >
                     {em}
@@ -174,35 +349,88 @@ export default function ChatView({ chat, user, onBack }: Props) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Attach menu */}
+      {attachOpen && (
+        <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--vn-border)", background: "var(--vn-card)", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.5rem", animation: "vn-appear 0.2s ease" }}>
+          {[
+            { icon: "Image", label: "Фото", color: "#2196F3" },
+            { icon: "Video", label: "Видео", color: "#1565C0" },
+            { icon: "FileText", label: "Документ", color: "#42A5F5" },
+            { icon: "Link", label: "Ссылка", color: "#29B6F6" },
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={() => {
+                setAttachOpen(false);
+                setMessages((prev) => [...prev, { id: Date.now(), text: `📎 ${item.label}`, mine: true, time: new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }), type: "text" }]);
+              }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.75rem 0.5rem", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--vn-blue-light)")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--vn-border)")}
+            >
+              <Icon name={item.icon} size={22} color={item.color} />
+              <span style={{ fontSize: "0.7rem", color: "var(--vn-muted)" }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
-      <div style={{ padding: "0.75rem 0.8rem", borderTop: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: "0.6rem", background: "var(--vn-card)" }}>
-        <button style={{ background: "rgba(255,107,53,0.1)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-          <Icon name="Camera" size={17} color="var(--vn-orange)" />
+      <div style={{ padding: "0.7rem 0.8rem", borderTop: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: "0.5rem", background: "var(--vn-card)" }}>
+        <button
+          onClick={() => setCameraOpen(true)}
+          style={{ background: "rgba(33,150,243,0.1)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.2s" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.22)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.1)")}
+        >
+          <Icon name="Camera" size={17} color="var(--vn-blue-bright)" />
         </button>
+
         <input
           className="vn-input"
           placeholder="Сообщение..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          style={{ flex: 1, padding: "0.6rem 0.9rem" }}
+          style={{ flex: 1, padding: "0.55rem 0.9rem", fontSize: "0.9rem" }}
         />
-        <button style={{ background: "rgba(255,107,53,0.1)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-          <Icon name="Paperclip" size={17} color="var(--vn-orange)" />
-        </button>
+
         <button
-          onClick={sendMessage}
-          style={{ background: "linear-gradient(135deg, var(--vn-orange), var(--vn-pink))", border: "none", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 12px rgba(255,107,53,0.4)" }}
+          onClick={() => setAttachOpen(!attachOpen)}
+          style={{ background: attachOpen ? "rgba(33,150,243,0.22)" : "rgba(33,150,243,0.1)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.2s" }}
         >
-          <Icon name="Send" size={17} color="white" />
+          <Icon name="Paperclip" size={17} color="var(--vn-blue-bright)" />
         </button>
+
+        {input.trim() ? (
+          <button
+            onClick={sendMessage}
+            style={{ background: "linear-gradient(135deg, var(--vn-blue), var(--vn-blue-light))", border: "none", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 14px rgba(33,150,243,0.45)", transition: "all 0.2s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            <Icon name="Send" size={17} color="white" />
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setMessages((prev) => [...prev, { id: Date.now(), text: "", mine: true, time: new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }), type: "voice" }]);
+            }}
+            style={{ background: "rgba(33,150,243,0.1)", border: "none", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.2s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.22)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.1)")}
+          >
+            <Icon name="Mic" size={17} color="var(--vn-blue-bright)" />
+          </button>
+        )}
+        <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} />
       </div>
 
-      {/* Media Gallery Modal */}
+      {/* Media Gallery */}
       {showMedia && (
         <div style={{ position: "absolute", inset: 0, background: "var(--vn-bg)", zIndex: 50, display: "flex", flexDirection: "column", animation: "vn-slide-in 0.25s ease" }}>
           <div style={{ padding: "1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={() => setShowMedia(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-orange)" }}>
+            <button onClick={() => setShowMedia(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
               <Icon name="ArrowLeft" size={22} />
             </button>
             <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem" }}>Медиафайлы</h2>
@@ -213,7 +441,7 @@ export default function ChatView({ chat, user, onBack }: Props) {
                 key={tab}
                 onClick={() => setActiveMediaTab(tab)}
                 style={{
-                  background: activeMediaTab === tab ? "linear-gradient(135deg, var(--vn-orange), var(--vn-pink))" : "var(--vn-card2)",
+                  background: activeMediaTab === tab ? "linear-gradient(135deg, var(--vn-blue), var(--vn-blue-light))" : "var(--vn-card2)",
                   border: "none",
                   borderRadius: "50px",
                   padding: "0.4rem 0.9rem",
@@ -232,7 +460,7 @@ export default function ChatView({ chat, user, onBack }: Props) {
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ textAlign: "center", color: "var(--vn-muted)" }}>
               <Icon name="Inbox" size={40} color="var(--vn-muted)" />
-              <p style={{ marginTop: "0.75rem", fontSize: "0.9rem" }}>Пока нет файлов в разделе «{activeMediaTab}»</p>
+              <p style={{ marginTop: "0.75rem", fontSize: "0.9rem" }}>Нет файлов в «{activeMediaTab}»</p>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
-import ChatView from "./ChatView";
+import ChatView, { ChatData } from "./ChatView";
 
 interface Chat {
   id: number;
@@ -24,10 +24,10 @@ const mockChats: Chat[] = [
 ];
 
 const avatarColors = [
-  "linear-gradient(135deg, #FF6B35, #E91E8C)",
-  "linear-gradient(135deg, #5B3FD4, #9B59B6)",
-  "linear-gradient(135deg, #00BCD4, #5B3FD4)",
-  "linear-gradient(135deg, #2ECC71, #00BCD4)",
+  "linear-gradient(135deg, #1565C0, #2196F3)",
+  "linear-gradient(135deg, #1976D2, #42A5F5)",
+  "linear-gradient(135deg, #0D47A1, #1976D2)",
+  "linear-gradient(135deg, #1565C0, #29B6F6)",
   "linear-gradient(135deg, #E91E8C, #FF6B35)",
   "linear-gradient(135deg, #9B59B6, #E91E8C)",
 ];
@@ -48,7 +48,8 @@ export default function ChatsScreen({ user }: Props) {
   );
 
   if (activeChat) {
-    return <ChatView chat={activeChat} user={user} onBack={() => setActiveChat(null)} />;
+    const chatData: ChatData = { id: activeChat.id, name: activeChat.name, avatar: activeChat.avatar, online: activeChat.online };
+    return <ChatView chat={chatData} user={user} onBack={() => setActiveChat(null)} />;
   }
 
   return (

@@ -78,7 +78,7 @@ export default function MainApp({ user, setUser }: Props) {
                   justifyContent: "center",
                   borderRadius: "50%",
                   background: isActive
-                    ? "linear-gradient(135deg, var(--vn-orange), var(--vn-pink))"
+                    ? "linear-gradient(135deg, var(--vn-blue), var(--vn-blue-light))"
                     : "transparent",
                   transition: "all 0.2s",
                 }}
@@ -94,7 +94,7 @@ export default function MainApp({ user, setUser }: Props) {
                       position: "absolute",
                       top: -2,
                       right: -2,
-                      background: "linear-gradient(135deg, var(--vn-orange), var(--vn-pink))",
+                      background: "linear-gradient(135deg, var(--vn-blue), var(--vn-blue-light))",
                       color: "white",
                       borderRadius: "50%",
                       width: 16,
@@ -115,7 +115,7 @@ export default function MainApp({ user, setUser }: Props) {
                 style={{
                   fontSize: "0.65rem",
                   fontWeight: isActive ? 600 : 400,
-                  color: isActive ? "var(--vn-orange)" : "var(--vn-muted)",
+                  color: isActive ? "var(--vn-blue-bright)" : "var(--vn-muted)",
                   transition: "all 0.2s",
                 }}
               >
