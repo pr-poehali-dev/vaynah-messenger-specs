@@ -12,9 +12,10 @@ type Tab = "search" | "chats" | "statuses" | "profile" | "notifications";
 interface Props {
   user: User;
   setUser: (u: User) => void;
+  onLogout?: () => void;
 }
 
-export default function MainApp({ user, setUser }: Props) {
+export default function MainApp({ user, setUser, onLogout }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("chats");
   const [notifCount] = useState(3);
 
@@ -33,7 +34,7 @@ export default function MainApp({ user, setUser }: Props) {
         {activeTab === "chats" && <ChatsScreen user={user} />}
         {activeTab === "statuses" && <StatusesScreen user={user} />}
         {activeTab === "notifications" && <NotificationsScreen />}
-        {activeTab === "profile" && <ProfileScreen user={user} setUser={setUser} />}
+        {activeTab === "profile" && <ProfileScreen user={user} setUser={setUser} onLogout={onLogout} />}
       </div>
 
       {/* Bottom Navigation */}

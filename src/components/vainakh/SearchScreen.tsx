@@ -1,5 +1,8 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ChatView, { ChatData } from "./ChatView";
+import CallScreen from "./CallScreen";
+import { User } from "@/pages/Index";
 
 interface SearchUser {
   id: number;
@@ -11,50 +14,53 @@ interface SearchUser {
   isFriend: boolean;
   isBlocked: boolean;
   friends: string[];
+  status: string;
+  online: boolean;
 }
 
-const mockUsers: SearchUser[] = [
-  { id: 1, name: "Зайнаб", surname: "Хасанова", city: "Грозный", age: 22, avatar: "З", isFriend: false, isBlocked: false, friends: ["Ислам", "Малика", "Руслан"] },
-  { id: 2, name: "Ислам", surname: "Дудаев", city: "Гудермес", age: 28, avatar: "И", isFriend: true, isBlocked: false, friends: ["Зайнаб", "Ахмед"] },
-  { id: 3, name: "Малика", surname: "Садулаева", city: "Грозный", age: 25, avatar: "М", isFriend: false, isBlocked: false, friends: ["Руслан"] },
-  { id: 4, name: "Руслан", surname: "Арсанов", city: "Шали", age: 31, avatar: "Р", isFriend: true, isBlocked: false, friends: ["Ислам", "Малика"] },
-  { id: 5, name: "Хеда", surname: "Гайтаева", city: "Аргун", age: 19, avatar: "Х", isFriend: false, isBlocked: false, friends: ["Зайнаб"] },
+const allUsers: SearchUser[] = [
+  { id: 1, name: "Зайнаб", surname: "Хасанова", city: "Грозный", age: 22, avatar: "З", isFriend: false, isBlocked: false, friends: ["Ислам", "Малика", "Руслан"], status: "На прогулке 🌿", online: true },
+  { id: 2, name: "Ислам", surname: "Дудаев", city: "Гудермес", age: 28, avatar: "И", isFriend: true, isBlocked: false, friends: ["Зайнаб", "Ахмед"], status: "Работаю 💼", online: true },
+  { id: 3, name: "Малика", surname: "Садулаева", city: "Грозный", age: 25, avatar: "М", isFriend: false, isBlocked: false, friends: ["Руслан"], status: "Хороший день ☀️", online: false },
+  { id: 4, name: "Руслан", surname: "Арсанов", city: "Шали", age: 31, avatar: "Р", isFriend: true, isBlocked: false, friends: ["Ислам", "Малика"], status: "", online: false },
+  { id: 5, name: "Хеда", surname: "Гайтаева", city: "Аргун", age: 19, avatar: "Х", isFriend: false, isBlocked: false, friends: ["Зайнаб"], status: "Алхамдулиллах 🙏", online: true },
+  { id: 6, name: "Адам", surname: "Берсанов", city: "Грозный", age: 24, avatar: "А", isFriend: false, isBlocked: false, friends: [], status: "В пути 🚗", online: false },
+  { id: 7, name: "Айна", surname: "Умарова", city: "Грозный", age: 21, avatar: "А", isFriend: false, isBlocked: false, friends: ["Малика"], status: "Слушаю музыку 🎵", online: true },
+  { id: 8, name: "Лема", surname: "Хаджиев", city: "Гудермес", age: 33, avatar: "Л", isFriend: false, isBlocked: false, friends: ["Руслан"], status: "", online: false },
 ];
 
 const avatarColors = [
-  "linear-gradient(135deg, #FF6B35, #E91E8C)",
-  "linear-gradient(135deg, #5B3FD4, #9B59B6)",
-  "linear-gradient(135deg, #00BCD4, #5B3FD4)",
-  "linear-gradient(135deg, #2ECC71, #00BCD4)",
-  "linear-gradient(135deg, #E91E8C, #9B59B6)",
+  "linear-gradient(135deg,#1565C0,#2196F3)",
+  "linear-gradient(135deg,#1976D2,#42A5F5)",
+  "linear-gradient(135deg,#0D47A1,#1976D2)",
+  "linear-gradient(135deg,#1565C0,#29B6F6)",
+  "linear-gradient(135deg,#0D47A1,#42A5F5)",
+  "linear-gradient(135deg,#1565C0,#64B5F6)",
+  "linear-gradient(135deg,#1976D2,#29B6F6)",
+  "linear-gradient(135deg,#0D47A1,#2196F3)",
 ];
 
-export default function SearchScreen() {
-  const [filters, setFilters] = useState({ name: "", surname: "", city: "", ageFrom: "", ageTo: "" });
-  const [results, setResults] = useState<SearchUser[]>([]);
-  const [searched, setSearched] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
-  const [users, setUsers] = useState(mockUsers);
+const dummyUser: User = { email: "", name: "", surname: "", city: "", phone: "", birthdate: "", about: "", avatar: "", online: true };
 
-  const handleSearch = () => {
-    const res = users.filter((u) => {
-      const matchName = !filters.name || u.name.toLowerCase().includes(filters.name.toLowerCase());
-      const matchSurname = !filters.surname || u.surname.toLowerCase().includes(filters.surname.toLowerCase());
-      const matchCity = !filters.city || u.city.toLowerCase().includes(filters.city.toLowerCase());
-      const matchAgeFrom = !filters.ageFrom || u.age >= Number(filters.ageFrom);
-      const matchAgeTo = !filters.ageTo || u.age <= Number(filters.ageTo);
-      return matchName && matchSurname && matchCity && matchAgeFrom && matchAgeTo;
-    });
-    setResults(res);
-    setSearched(true);
-  };
+export default function SearchScreen() {
+  const [query, setQuery] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [users, setUsers] = useState(allUsers);
+  const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
+  const [openChat, setOpenChat] = useState<ChatData | null>(null);
+  const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
+
+  const filtered = users.filter((u) => {
+    if (u.isBlocked) return false;
+    const q = query.toLowerCase();
+    const matchQ = !q || u.name.toLowerCase().includes(q) || u.surname.toLowerCase().includes(q);
+    const matchCity = !cityFilter || u.city.toLowerCase().includes(cityFilter.toLowerCase());
+    return matchQ && matchCity;
+  });
 
   const toggleFriend = (userId: number) => {
     setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isFriend: !u.isFriend } : u));
-    if (selectedUser?.id === userId) {
-      setSelectedUser((prev) => prev ? { ...prev, isFriend: !prev.isFriend } : null);
-    }
-    setResults((prev) => prev.map((u) => u.id === userId ? { ...u, isFriend: !u.isFriend } : u));
+    setSelectedUser((prev) => prev?.id === userId ? { ...prev, isFriend: !prev.isFriend } : prev);
   };
 
   const blockUser = (userId: number) => {
@@ -62,93 +68,93 @@ export default function SearchScreen() {
     setSelectedUser(null);
   };
 
+  if (openCall) {
+    return <div style={{ position: "relative", height: "100%" }}><CallScreen type={openCall.type} name={openCall.chat.name} avatar={openCall.chat.avatar} onEnd={() => setOpenCall(null)} /></div>;
+  }
+
+  if (openChat) {
+    return <ChatView chat={openChat} user={dummyUser} onBack={() => setOpenChat(null)} />;
+  }
+
   if (selectedUser) {
-    const userColor = avatarColors[selectedUser.id % avatarColors.length];
+    const chatData: ChatData = { id: selectedUser.id, name: `${selectedUser.name} ${selectedUser.surname}`, avatar: selectedUser.avatar, online: selectedUser.online, city: selectedUser.city, age: selectedUser.age };
+    const color = avatarColors[selectedUser.id % avatarColors.length];
     return (
       <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-        <div style={{ padding: "0.9rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setSelectedUser(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-orange)" }}>
-            <Icon name="ArrowLeft" size={22} />
-          </button>
+        <div style={{ padding: "0.9rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
+          <button onClick={() => setSelectedUser(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}><Icon name="ArrowLeft" size={22} /></button>
           <span style={{ fontWeight: 600 }}>Профиль</span>
         </div>
-
         <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
           {/* Cover */}
-          <div style={{ height: 120, background: "linear-gradient(135deg, var(--vn-orange), var(--vn-pink), var(--vn-indigo))", position: "relative" }}>
-            <div style={{ position: "absolute", bottom: -30, left: "50%", transform: "translateX(-50%)", width: 70, height: 70, borderRadius: "50%", background: userColor, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1.5rem", color: "white", border: "3px solid var(--vn-bg)" }}>
+          <div style={{ height: 120, background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light),var(--vn-blue-bright))", position: "relative" }}>
+            <div style={{ position: "absolute", inset: 0, background: "url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'><circle cx='160' cy='20' r='70' fill='rgba(255,255,255,0.06)'/></svg>\")" }} />
+            <div style={{ position: "absolute", bottom: -36, left: "50%", transform: "translateX(-50%)", width: 72, height: 72, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1.6rem", color: "white", border: "3px solid var(--vn-bg)", boxShadow: "0 6px 20px rgba(33,150,243,0.35)" }}>
               {selectedUser.avatar}
             </div>
           </div>
-
-          <div style={{ paddingTop: "2.5rem", padding: "2.5rem 1.2rem 1.2rem", textAlign: "center" }}>
-            <h2 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.4rem" }}>
-              {selectedUser.name} {selectedUser.surname}
-            </h2>
-            <p style={{ color: "var(--vn-muted)", fontSize: "0.85rem", marginTop: 4 }}>
-              {selectedUser.age} лет · {selectedUser.city}
-            </p>
+          <div style={{ paddingTop: "2.8rem", padding: "2.8rem 1.2rem 1.2rem", textAlign: "center" }}>
+            <h2 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.4rem" }}>{selectedUser.name} {selectedUser.surname}</h2>
+            <p style={{ color: "var(--vn-muted)", fontSize: "0.84rem", marginTop: 4 }}>{selectedUser.age} лет · {selectedUser.city}</p>
+            {selectedUser.status && <p style={{ color: "var(--vn-blue-bright)", fontSize: "0.85rem", marginTop: 6, fontStyle: "italic" }}>{selectedUser.status}</p>}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: selectedUser.online ? "#2ECC71" : "var(--vn-muted)" }} />
+              <span style={{ fontSize: "0.78rem", color: selectedUser.online ? "#2ECC71" : "var(--vn-muted)" }}>{selectedUser.online ? "онлайн" : "не в сети"}</span>
+            </div>
           </div>
 
-          {/* Action buttons */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", padding: "0 1.2rem 1.2rem" }}>
-            <button
-              className="vn-btn"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0.75rem" }}
-            >
-              <Icon name="MessageCircle" size={16} color="white" />
-              Написать
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem", padding: "0 1.2rem", marginBottom: "0.65rem" }}>
+            <button onClick={() => setOpenChat(chatData)} className="vn-btn" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.75rem", fontSize: "0.88rem" }}>
+              <Icon name="MessageCircle" size={15} color="white" />Написать
             </button>
             <button
               onClick={() => toggleFriend(selectedUser.id)}
               className="vn-btn"
-              style={{
-                background: selectedUser.isFriend
-                  ? "var(--vn-card2)"
-                  : "linear-gradient(135deg, var(--vn-indigo), var(--vn-purple))",
-                border: selectedUser.isFriend ? "1px solid var(--vn-border)" : "none",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0.75rem"
-              }}
-            >
-              <Icon name={selectedUser.isFriend ? "UserMinus" : "UserPlus"} size={16} color="white" />
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.75rem", fontSize: "0.88rem", background: selectedUser.isFriend ? "var(--vn-card2)" : "linear-gradient(135deg,#1565C0,#42A5F5)", border: selectedUser.isFriend ? "1px solid var(--vn-border)" : "none" }}>
+              <Icon name={selectedUser.isFriend ? "UserMinus" : "UserPlus"} size={15} color="white" />
               {selectedUser.isFriend ? "Удалить" : "Добавить"}
             </button>
           </div>
-
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem", padding: "0 1.2rem", marginBottom: "1rem" }}>
+            <button onClick={() => { setSelectedUser(null); setOpenCall({ type: "audio", chat: chatData }); }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.65rem", background: "rgba(46,204,113,0.1)", border: "1px solid rgba(46,204,113,0.3)", borderRadius: "0.75rem", color: "#2ECC71", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600 }}>
+              <Icon name="Phone" size={15} color="#2ECC71" />Позвонить
+            </button>
+            <button onClick={() => { setSelectedUser(null); setOpenCall({ type: "video", chat: chatData }); }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.65rem", background: "rgba(33,150,243,0.1)", border: "1px solid rgba(33,150,243,0.25)", borderRadius: "0.75rem", color: "var(--vn-blue-bright)", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600 }}>
+              <Icon name="Video" size={15} color="var(--vn-blue-bright)" />Видео
+            </button>
+          </div>
           <div style={{ padding: "0 1.2rem 1.2rem" }}>
-            <button
-              onClick={() => blockUser(selectedUser.id)}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "rgba(231,76,60,0.1)", border: "1px solid rgba(231,76,60,0.3)", borderRadius: "0.75rem", padding: "0.75rem", color: "#E74C3C", cursor: "pointer", fontSize: "0.9rem", fontWeight: 500 }}
-            >
-              <Icon name="Ban" size={16} color="#E74C3C" />
-              Заблокировать
+            <button onClick={() => blockUser(selectedUser.id)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.25)", borderRadius: "0.75rem", padding: "0.75rem", color: "#E74C3C", cursor: "pointer", fontSize: "0.88rem" }}>
+              <Icon name="Ban" size={15} color="#E74C3C" />Заблокировать
             </button>
           </div>
 
-          {/* Photo placeholders */}
-          <div style={{ padding: "0 1.2rem" }}>
-            <h3 style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.75rem", color: "var(--vn-muted)" }}>Фото</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+          {/* Photo grid */}
+          <div style={{ padding: "0 1.2rem 1rem" }}>
+            <p style={{ fontSize: "0.75rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.6rem" }}>Фото</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4 }}>
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} style={{ aspectRatio: "1", borderRadius: "0.5rem", background: `linear-gradient(135deg, ${["#FF6B35","#9B59B6","#00BCD4","#E91E8C","#5B3FD4","#2ECC71"][i]}44, ${["#E91E8C","#5B3FD4","#9B59B6","#FF6B35","#00BCD4","#9B59B6"][i]}44)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon name="Image" size={20} color="rgba(255,255,255,0.3)" />
+                <div key={i} style={{ aspectRatio: "1", borderRadius: "0.5rem", background: `linear-gradient(135deg,rgba(21,101,192,${0.25 + i * 0.04}),rgba(33,150,243,${0.18 + i * 0.04}))`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon name="Image" size={18} color="rgba(255,255,255,0.25)" />
                 </div>
               ))}
             </div>
           </div>
 
           {/* Friends */}
-          <div style={{ padding: "1.2rem" }}>
-            <h3 style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.75rem", color: "var(--vn-muted)" }}>Друзья</h3>
+          <div style={{ padding: "0 1.2rem 1.5rem" }}>
+            <p style={{ fontSize: "0.75rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.65rem" }}>Общие друзья</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {selectedUser.friends.map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "50px", padding: "0.35rem 0.75rem" }}>
-                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "white" }}>
-                    {f[0]}
-                  </div>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "50px", padding: "0.3rem 0.7rem" }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "white" }}>{f[0]}</div>
                   <span style={{ fontSize: "0.82rem" }}>{f}</span>
                 </div>
               ))}
+              {selectedUser.friends.length === 0 && <span style={{ fontSize: "0.82rem", color: "var(--vn-muted)" }}>Нет общих</span>}
             </div>
           </div>
         </div>
@@ -158,63 +164,69 @@ export default function SearchScreen() {
 
   return (
     <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* Header + filters */}
       <div style={{ padding: "1.2rem 1.2rem 0.8rem", borderBottom: "1px solid var(--vn-border)" }}>
-        <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem", marginBottom: "1rem" }} className="vn-gradient-text">
-          ВайНах Поиск
-        </h1>
+        <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem", marginBottom: "0.9rem" }} className="vn-gradient-text">ВайНах Поиск</h1>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
-            <input className="vn-input" placeholder="Имя" value={filters.name} onChange={(e) => setFilters({ ...filters, name: e.target.value })} style={{ fontSize: "0.85rem" }} />
-            <input className="vn-input" placeholder="Фамилия" value={filters.surname} onChange={(e) => setFilters({ ...filters, surname: e.target.value })} style={{ fontSize: "0.85rem" }} />
+          <div style={{ position: "relative" }}>
+            <Icon name="Search" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
+            <input className="vn-input" placeholder="Имя или фамилия" value={query} onChange={(e) => setQuery(e.target.value)} style={{ paddingLeft: "2.5rem", fontSize: "0.9rem" }} />
           </div>
-          <input className="vn-input" placeholder="Город" value={filters.city} onChange={(e) => setFilters({ ...filters, city: e.target.value })} style={{ fontSize: "0.85rem" }} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
-            <input className="vn-input" placeholder="Возраст от" type="number" value={filters.ageFrom} onChange={(e) => setFilters({ ...filters, ageFrom: e.target.value })} style={{ fontSize: "0.85rem" }} />
-            <input className="vn-input" placeholder="Возраст до" type="number" value={filters.ageTo} onChange={(e) => setFilters({ ...filters, ageTo: e.target.value })} style={{ fontSize: "0.85rem" }} />
+          <div style={{ position: "relative" }}>
+            <Icon name="MapPin" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
+            <input className="vn-input" placeholder="Город" value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} style={{ paddingLeft: "2.5rem", fontSize: "0.9rem" }} />
           </div>
-          <button className="vn-btn" onClick={handleSearch} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-            <Icon name="Search" size={16} color="white" />
-            Найти
-          </button>
         </div>
       </div>
 
+      {/* Results */}
       <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-        {searched && results.length === 0 && (
+        <div style={{ padding: "0.5rem 1.2rem 0.3rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "0.75rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            {filtered.length} {filtered.length === 1 ? "человек" : filtered.length < 5 ? "человека" : "человек"}
+          </span>
+          {(query || cityFilter) && (
+            <button onClick={() => { setQuery(""); setCityFilter(""); }} style={{ background: "none", border: "none", color: "var(--vn-blue-bright)", cursor: "pointer", fontSize: "0.78rem" }}>
+              Сбросить
+            </button>
+          )}
+        </div>
+
+        {filtered.length === 0 ? (
           <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
             <Icon name="SearchX" size={40} color="var(--vn-muted)" />
             <p style={{ marginTop: "1rem" }}>Никого не найдено</p>
           </div>
-        )}
-        {results.map((u, i) => (
-          <div
-            key={u.id}
-            style={{ display: "flex", alignItems: "center", gap: "0.9rem", padding: "0.9rem 1.2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", animation: `vn-appear 0.3s ease ${i * 0.07}s both` }}
+        ) : filtered.map((u, i) => (
+          <div key={u.id}
+            style={{ display: "flex", alignItems: "center", gap: "0.9rem", padding: "0.8rem 1.2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", animation: `vn-appear 0.3s ease ${i * 0.05}s both`, transition: "background 0.15s", cursor: "pointer" }}
+            onClick={() => setSelectedUser(u)}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.05)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
-            <button onClick={() => setSelectedUser(u)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.9rem", flex: 1, textAlign: "left" }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: avatarColors[u.id % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", flexShrink: 0 }}>
+            {/* Avatar */}
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div style={{ width: 50, height: 50, borderRadius: "50%", background: avatarColors[u.id % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
                 {u.avatar}
               </div>
-              <div>
-                <div style={{ fontWeight: 600 }}>{u.name} {u.surname}</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--vn-muted)" }}>{u.age} лет · {u.city}</div>
-              </div>
-            </button>
+              {u.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{u.name} {u.surname}</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--vn-muted)", marginTop: 1 }}>{u.age} лет · {u.city}</div>
+              {u.status && <div style={{ fontSize: "0.76rem", color: "var(--vn-blue-bright)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.status}</div>}
+            </div>
+
             <button
-              onClick={() => toggleFriend(u.id)}
+              onClick={(e) => { e.stopPropagation(); toggleFriend(u.id); }}
               style={{
-                background: u.isFriend ? "rgba(46,204,113,0.15)" : "rgba(255,107,53,0.1)",
-                border: `1px solid ${u.isFriend ? "rgba(46,204,113,0.4)" : "rgba(255,107,53,0.3)"}`,
-                borderRadius: "50px",
-                padding: "0.4rem 0.75rem",
-                color: u.isFriend ? "#2ECC71" : "var(--vn-orange)",
-                cursor: "pointer",
-                fontSize: "0.78rem",
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-                transition: "all 0.2s",
-              }}
-            >
+                background: u.isFriend ? "rgba(46,204,113,0.12)" : "rgba(33,150,243,0.1)",
+                border: `1px solid ${u.isFriend ? "rgba(46,204,113,0.3)" : "rgba(33,150,243,0.25)"}`,
+                borderRadius: "50px", padding: "0.35rem 0.7rem",
+                color: u.isFriend ? "#2ECC71" : "var(--vn-blue-bright)",
+                cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s", flexShrink: 0,
+              }}>
               {u.isFriend ? "✓ Друг" : "+ Добавить"}
             </button>
           </div>

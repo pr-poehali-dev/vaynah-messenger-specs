@@ -133,7 +133,17 @@ export default function Index() {
             email={loginEmail}
           />
         )}
-        {screen === "app" && <MainApp user={user} setUser={setUser} />}
+        {screen === "app" && (
+          <MainApp
+            user={user}
+            setUser={setUser}
+            onLogout={() => {
+              setScreen("auth");
+              setUser({ ...defaultUser });
+              setLoginEmail("");
+            }}
+          />
+        )}
       </div>
     </div>
   );
