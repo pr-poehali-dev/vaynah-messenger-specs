@@ -41,14 +41,14 @@ const dummyUser: User = { email: "", name: "", surname: "", city: "", phone: "",
 export default function NotificationsScreen() {
   const [notifs, setNotifs] = useState(mockNotifs);
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
-  const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
+  const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData; incoming?: boolean } | null>(null);
 
   const remove = (id: number) => setNotifs((prev) => prev.filter((n) => n.id !== id));
 
   if (openCall) {
     return (
       <div style={{ position: "relative", height: "100%" }}>
-        <CallScreen type={openCall.type} name={openCall.chat.name} avatar={openCall.chat.avatar} onEnd={() => setOpenCall(null)} />
+        <CallScreen type={openCall.type} name={openCall.chat.name} avatar={openCall.chat.avatar} onEnd={() => setOpenCall(null)} incoming={openCall.incoming} />
       </div>
     );
   }
@@ -108,7 +108,7 @@ export default function NotificationsScreen() {
                   {(n.type === "missed_audio" || n.type === "missed_video") && (
                     <>
                       <button
-                        onClick={() => { remove(n.id); setOpenCall({ type: n.type === "missed_audio" ? "audio" : "video", chat: n.chatData }); }}
+                        onClick={() => { remove(n.id); setOpenCall({ type: n.type === "missed_audio" ? "audio" : "video", chat: n.chatData, incoming: true }); }}
                         style={{ background: "rgba(46,204,113,0.12)", border: "1px solid rgba(46,204,113,0.3)", borderRadius: "50px", padding: "0.3rem 0.75rem", color: "#2ECC71", cursor: "pointer", fontSize: "0.75rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
                         <Icon name={n.type === "missed_audio" ? "Phone" : "Video"} size={11} color="#2ECC71" />
                         Перезвонить
