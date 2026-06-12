@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 
@@ -11,9 +11,22 @@ interface Status {
   time: string;
   viewed: boolean;
   emoji?: string;
+  color?: string;
+  fileName?: string;
   reactions: Record<string, number>;
   myReaction?: string;
 }
+
+const STATUS_COLORS = [
+  "linear-gradient(160deg,#050B18,#0A1628)",
+  "linear-gradient(160deg,#0D47A1,#1565C0)",
+  "linear-gradient(160deg,#1B5E20,#2E7D32)",
+  "linear-gradient(160deg,#7B1FA2,#E65100)",
+  "linear-gradient(160deg,#880E4F,#C2185B)",
+  "linear-gradient(160deg,#01579B,#00ACC1)",
+  "linear-gradient(160deg,#3E2723,#5D4037)",
+  "linear-gradient(160deg,#263238,#455A64)",
+];
 
 const mockStatuses: Status[] = [
   { id: 1, user: "Зайнаб", avatar: "З", type: "text", content: "Алхамдулиллах за всё! 🌿", time: "15 мин", viewed: false, emoji: "🙏", reactions: { "❤️": 5, "🙏": 3 } },
@@ -42,7 +55,26 @@ export default function StatusesScreen({ user }: Props) {
   const [newType, setNewType] = useState<"text" | "photo" | "video" | "audio" | "link">("text");
   const [newContent, setNewContent] = useState("");
   const [emojiOverlay, setEmojiOverlay] = useState("");
+  const [newColor, setNewColor] = useState(STATUS_COLORS[0]);
+  const [newFileName, setNewFileName] = useState("");
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
+  const pickFile = (type: "photo" | "video" | "audio") => {
+    if (type === "photo") photoInputRef.current?.click();
+    if (type === "video") videoInputRef.current?.click();
+    if (type === "audio") audioInputRef.current?.click();
+  };
+
+  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNewFileName(file.name);
+    if (!newContent) setNewContent(file.name);
+    e.target.value = "";
+  };
 
   const viewStatus = (s: Status) => {
     setActiveStatus({ ...s });
@@ -85,7 +117,7 @@ export default function StatusesScreen({ user }: Props) {
     const reactionEntries = Object.entries(activeStatus.reactions).filter(([, c]) => c > 0);
 
     return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: bgMap[activeStatus.type] || bgMap.text, position: "relative" }}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: activeStatus.color || bgMap[activeStatus.type] || bgMap.text, position: "relative" }}>
         {/* Progress bar */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "0.8rem 1rem 0", zIndex: 10 }}>
           <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.2)", marginBottom: "0.75rem", overflow: "hidden" }}>
@@ -256,18 +288,23 @@ export default function StatusesScreen({ user }: Props) {
       { id: "audio", icon: "Music", label: "Аудио" },
     ] as const;
 
+    const isMedia = newType === "photo" || newType === "video" || newType === "audio";
+    const canPublish = isMedia ? !!newFileName : !!newContent.trim();
+
     const publish = () => {
-      if (!newContent) return;
+      if (!canPublish) return;
       setStatuses((prev) => [
         {
           id: Date.now(),
           user: user.name || "Я",
           avatar: (user.name || "Я")[0],
           type: newType === "link" ? "text" : newType,
-          content: newContent,
+          content: newContent || newFileName || "Новый статус",
           time: "только что",
           viewed: false,
           emoji: emojiOverlay || undefined,
+          color: newType === "text" || newType === "link" ? newColor : undefined,
+          fileName: newFileName || undefined,
           reactions: {},
         },
         ...prev,
@@ -275,6 +312,9 @@ export default function StatusesScreen({ user }: Props) {
       setShowCreate(false);
       setNewContent("");
       setEmojiOverlay("");
+      setNewFileName("");
+      setNewColor(STATUS_COLORS[0]);
+      setNewType("text");
     };
 
     return (
@@ -287,7 +327,8 @@ export default function StatusesScreen({ user }: Props) {
           <button
             className="vn-btn"
             onClick={publish}
-            style={{ width: "auto", padding: "0.45rem 1rem", fontSize: "0.85rem", opacity: newContent ? 1 : 0.5 }}
+            disabled={!canPublish}
+            style={{ width: "auto", padding: "0.45rem 1rem", fontSize: "0.85rem", opacity: canPublish ? 1 : 0.5, cursor: canPublish ? "pointer" : "not-allowed" }}
           >
             Опубликовать
           </button>
@@ -298,7 +339,13 @@ export default function StatusesScreen({ user }: Props) {
             {typeOptions.map((t) => (
               <button
                 key={t.id}
-                onClick={() => setNewType(t.id)}
+                onClick={() => {
+                  setNewType(t.id);
+                  setNewFileName("");
+                  if (t.id === "photo" || t.id === "video" || t.id === "audio") {
+                    setTimeout(() => pickFile(t.id), 50);
+                  }
+                }}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -320,15 +367,71 @@ export default function StatusesScreen({ user }: Props) {
             ))}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {/* Hidden file inputs */}
+          <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onFileChosen} />
+          <input ref={videoInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={onFileChosen} />
+          <input ref={audioInputRef} type="file" accept="audio/*" style={{ display: "none" }} onChange={onFileChosen} />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Media preview / picker */}
+            {isMedia && (
+              <div>
+                {newFileName ? (
+                  <div style={{ position: "relative", borderRadius: "1rem", overflow: "hidden", background: newColor, height: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, border: "1px solid var(--vn-border)" }}>
+                    <Icon name={newType === "photo" ? "Image" : newType === "video" ? "Video" : "Music"} size={48} color="rgba(255,255,255,0.5)" />
+                    <span style={{ color: "white", fontSize: "0.85rem", padding: "0 1rem", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", whiteSpace: "nowrap" }}>{newFileName}</span>
+                    <button onClick={() => pickFile(newType as "photo" | "video" | "audio")} style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "50px", padding: "0.3rem 0.9rem", color: "white", cursor: "pointer", fontSize: "0.78rem" }}>
+                      Заменить
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => pickFile(newType as "photo" | "video" | "audio")}
+                    style={{ width: "100%", height: 180, borderRadius: "1rem", border: "2px dashed var(--vn-border)", background: "var(--vn-card2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", color: "var(--vn-muted)" }}>
+                    <Icon name={newType === "photo" ? "ImagePlus" : newType === "video" ? "Video" : "Music"} size={40} color="var(--vn-blue-bright)" />
+                    <span style={{ fontSize: "0.9rem" }}>Выбрать {newType === "photo" ? "фото" : newType === "video" ? "видео" : "аудио"} из телефона</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Text/link area with preview */}
+            {!isMedia && (
+              <div style={{ borderRadius: "1rem", background: newColor, padding: "2rem 1.2rem", minHeight: 160, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                {emojiOverlay && <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>{emojiOverlay}</div>}
+                <span style={{ color: "rgba(255,255,255,0.95)", fontSize: "1.2rem", fontWeight: 700, textShadow: "0 2px 12px rgba(0,0,0,0.4)", wordBreak: "break-word" }}>
+                  {newContent || (newType === "link" ? "Ваша ссылка" : "Текст статуса появится здесь")}
+                </span>
+              </div>
+            )}
+
             <textarea
               className="vn-input"
-              placeholder={newType === "text" ? "Напиши что-нибудь..." : newType === "link" ? "Вставь ссылку..." : "Описание..."}
+              placeholder={newType === "text" ? "Напиши что-нибудь..." : newType === "link" ? "Вставь ссылку..." : "Подпись (необязательно)..."}
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
-              rows={4}
+              rows={3}
               style={{ resize: "none" }}
             />
+
+            {/* Color palette (text/link) */}
+            {!isMedia && (
+              <div>
+                <label style={{ fontSize: "0.78rem", color: "var(--vn-muted)", display: "block", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Цвет фона
+                </label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {STATUS_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setNewColor(c)}
+                      style={{ width: 40, height: 40, borderRadius: "50%", background: c, border: newColor === c ? "3px solid var(--vn-blue-bright)" : "2px solid var(--vn-border)", cursor: "pointer", transition: "all 0.15s" }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Emoji overlay */}
             <div>
               <label style={{ fontSize: "0.78rem", color: "var(--vn-muted)", display: "block", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 Смайлик поверх
@@ -366,17 +469,10 @@ export default function StatusesScreen({ user }: Props) {
   // STATUSES LIST
   return (
     <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div style={{ padding: "1.2rem 1.2rem 0.8rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ padding: "1.2rem 1.2rem 0.8rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center" }}>
         <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem" }} className="vn-gradient-text">
           ВайНах Сторисы
         </h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{ background: "linear-gradient(135deg, var(--vn-blue), var(--vn-blue-light))", border: "none", borderRadius: "50px", padding: "0.4rem 0.9rem", color: "white", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, boxShadow: "0 4px 14px rgba(33,150,243,0.35)" }}
-        >
-          <Icon name="Plus" size={14} color="white" />
-          Добавить
-        </button>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">

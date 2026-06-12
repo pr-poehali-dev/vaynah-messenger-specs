@@ -2,6 +2,8 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import ChatView, { ChatData } from "./ChatView";
 import CallScreen from "./CallScreen";
+import CityPicker from "./CityPicker";
+import { useFriends, Person } from "./useFriends";
 import { User } from "@/pages/Index";
 
 interface SearchUser {
@@ -11,7 +13,6 @@ interface SearchUser {
   city: string;
   age: number;
   avatar: string;
-  isFriend: boolean;
   isBlocked: boolean;
   friends: string[];
   status: string;
@@ -19,15 +20,19 @@ interface SearchUser {
 }
 
 const allUsers: SearchUser[] = [
-  { id: 1, name: "Зайнаб", surname: "Хасанова", city: "Грозный", age: 22, avatar: "З", isFriend: false, isBlocked: false, friends: ["Ислам", "Малика", "Руслан"], status: "На прогулке 🌿", online: true },
-  { id: 2, name: "Ислам", surname: "Дудаев", city: "Гудермес", age: 28, avatar: "И", isFriend: true, isBlocked: false, friends: ["Зайнаб", "Ахмед"], status: "Работаю 💼", online: true },
-  { id: 3, name: "Малика", surname: "Садулаева", city: "Грозный", age: 25, avatar: "М", isFriend: false, isBlocked: false, friends: ["Руслан"], status: "Хороший день ☀️", online: false },
-  { id: 4, name: "Руслан", surname: "Арсанов", city: "Шали", age: 31, avatar: "Р", isFriend: true, isBlocked: false, friends: ["Ислам", "Малика"], status: "", online: false },
-  { id: 5, name: "Хеда", surname: "Гайтаева", city: "Аргун", age: 19, avatar: "Х", isFriend: false, isBlocked: false, friends: ["Зайнаб"], status: "Алхамдулиллах 🙏", online: true },
-  { id: 6, name: "Адам", surname: "Берсанов", city: "Грозный", age: 24, avatar: "А", isFriend: false, isBlocked: false, friends: [], status: "В пути 🚗", online: false },
-  { id: 7, name: "Айна", surname: "Умарова", city: "Грозный", age: 21, avatar: "А", isFriend: false, isBlocked: false, friends: ["Малика"], status: "Слушаю музыку 🎵", online: true },
-  { id: 8, name: "Лема", surname: "Хаджиев", city: "Гудермес", age: 33, avatar: "Л", isFriend: false, isBlocked: false, friends: ["Руслан"], status: "", online: false },
+  { id: 1, name: "Зайнаб", surname: "Хасанова", city: "Грозный", age: 22, avatar: "З", isBlocked: false, friends: ["Ислам", "Малика", "Руслан"], status: "На прогулке 🌿", online: true },
+  { id: 2, name: "Ислам", surname: "Дудаев", city: "Гудермес", age: 28, avatar: "И", isBlocked: false, friends: ["Зайнаб", "Ахмед"], status: "Работаю 💼", online: true },
+  { id: 3, name: "Малика", surname: "Садулаева", city: "Грозный", age: 25, avatar: "М", isBlocked: false, friends: ["Руслан"], status: "Хороший день ☀️", online: false },
+  { id: 4, name: "Руслан", surname: "Арсанов", city: "Шали", age: 31, avatar: "Р", isBlocked: false, friends: ["Ислам", "Малика"], status: "", online: false },
+  { id: 5, name: "Хеда", surname: "Гайтаева", city: "Аргун", age: 19, avatar: "Х", isBlocked: false, friends: ["Зайнаб"], status: "Алхамдулиллах 🙏", online: true },
+  { id: 6, name: "Адам", surname: "Берсанов", city: "Грозный", age: 24, avatar: "А", isBlocked: false, friends: [], status: "В пути 🚗", online: false },
+  { id: 7, name: "Айна", surname: "Умарова", city: "Грозный", age: 21, avatar: "А", isBlocked: false, friends: ["Малика"], status: "Слушаю музыку 🎵", online: true },
+  { id: 8, name: "Лема", surname: "Хаджиев", city: "Гудермес", age: 33, avatar: "Л", isBlocked: false, friends: ["Руслан"], status: "", online: false },
 ];
+
+function toPerson(u: SearchUser): Person {
+  return { id: u.id, name: u.name, surname: u.surname, city: u.city, age: u.age, avatar: u.avatar, online: u.online, status: u.status, mutualFriends: u.friends };
+}
 
 const avatarColors = [
   "linear-gradient(135deg,#1565C0,#2196F3)",
@@ -45,10 +50,16 @@ const dummyUser: User = { email: "", name: "", surname: "", city: "", phone: "",
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+  const [showCityPicker, setShowCityPicker] = useState(false);
   const [users, setUsers] = useState(allUsers);
   const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const { sendRequest, cancelRequest, removeFriend, isFriend, isPending } = useFriends();
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
 
   const filtered = users.filter((u) => {
     if (u.isBlocked) return false;
@@ -58,10 +69,20 @@ export default function SearchScreen() {
     return matchQ && matchCity;
   });
 
-  const toggleFriend = (userId: number) => {
-    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isFriend: !u.isFriend } : u));
-    setSelectedUser((prev) => prev?.id === userId ? { ...prev, isFriend: !prev.isFriend } : prev);
+  const handleFriendBtn = (u: SearchUser) => {
+    if (isFriend(u.id)) {
+      removeFriend(u.id);
+      showToast("Удалён из друзей");
+    } else if (isPending(u.id)) {
+      cancelRequest(u.id);
+      showToast("Запрос отменён");
+    } else {
+      sendRequest(toPerson(u));
+      showToast(`Запрос отправлен ${u.name}`);
+    }
   };
+
+  const friendBtnLabel = (id: number) => isFriend(id) ? "✓ Друг" : isPending(id) ? "Запрос отправлен" : "+ Добавить";
 
   const blockUser = (userId: number) => {
     setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isBlocked: true } : u));
@@ -108,11 +129,11 @@ export default function SearchScreen() {
               <Icon name="MessageCircle" size={15} color="white" />Написать
             </button>
             <button
-              onClick={() => toggleFriend(selectedUser.id)}
+              onClick={() => handleFriendBtn(selectedUser)}
               className="vn-btn"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.75rem", fontSize: "0.88rem", background: selectedUser.isFriend ? "var(--vn-card2)" : "linear-gradient(135deg,#1565C0,#42A5F5)", border: selectedUser.isFriend ? "1px solid var(--vn-border)" : "none" }}>
-              <Icon name={selectedUser.isFriend ? "UserMinus" : "UserPlus"} size={15} color="white" />
-              {selectedUser.isFriend ? "Удалить" : "Добавить"}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.75rem", fontSize: "0.88rem", background: isFriend(selectedUser.id) ? "var(--vn-card2)" : isPending(selectedUser.id) ? "var(--vn-card2)" : "linear-gradient(135deg,#1565C0,#42A5F5)", border: (isFriend(selectedUser.id) || isPending(selectedUser.id)) ? "1px solid var(--vn-border)" : "none", color: (isFriend(selectedUser.id) || isPending(selectedUser.id)) ? "var(--vn-text)" : "white" }}>
+              <Icon name={isFriend(selectedUser.id) ? "UserMinus" : isPending(selectedUser.id) ? "Clock" : "UserPlus"} size={15} color={(isFriend(selectedUser.id) || isPending(selectedUser.id)) ? "var(--vn-muted)" : "white"} />
+              {isFriend(selectedUser.id) ? "Удалить" : isPending(selectedUser.id) ? "Запрос отправлен" : "Добавить"}
             </button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem", padding: "0 1.2rem", marginBottom: "1rem" }}>
@@ -148,12 +169,19 @@ export default function SearchScreen() {
           <div style={{ padding: "0 1.2rem 1.5rem" }}>
             <p style={{ fontSize: "0.75rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.65rem" }}>Общие друзья</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {selectedUser.friends.map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "50px", padding: "0.3rem 0.7rem" }}>
-                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "white" }}>{f[0]}</div>
-                  <span style={{ fontSize: "0.82rem" }}>{f}</span>
-                </div>
-              ))}
+              {selectedUser.friends.map((f, i) => {
+                const found = allUsers.find((au) => au.name === f);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => found && setSelectedUser(found)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "50px", padding: "0.3rem 0.7rem", cursor: found ? "pointer" : "default" }}
+                  >
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "white" }}>{f[0]}</div>
+                    <span style={{ fontSize: "0.82rem" }}>{f}</span>
+                  </button>
+                );
+              })}
               {selectedUser.friends.length === 0 && <span style={{ fontSize: "0.82rem", color: "var(--vn-muted)" }}>Нет общих</span>}
             </div>
           </div>
@@ -172,10 +200,19 @@ export default function SearchScreen() {
             <Icon name="Search" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
             <input className="vn-input" placeholder="Имя или фамилия" value={query} onChange={(e) => setQuery(e.target.value)} style={{ paddingLeft: "2.5rem", fontSize: "0.9rem" }} />
           </div>
-          <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setShowCityPicker(true)}
+            className="vn-input"
+            style={{ position: "relative", display: "flex", alignItems: "center", width: "100%", paddingLeft: "2.5rem", fontSize: "0.9rem", cursor: "pointer", textAlign: "left", background: "var(--vn-card2)" }}
+          >
             <Icon name="MapPin" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
-            <input className="vn-input" placeholder="Город" value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} style={{ paddingLeft: "2.5rem", fontSize: "0.9rem" }} />
-          </div>
+            <span style={{ flex: 1, color: cityFilter ? "var(--vn-text)" : "var(--vn-muted)" }}>{cityFilter || "Город"}</span>
+            {cityFilter ? (
+              <span onClick={(e) => { e.stopPropagation(); setCityFilter(""); }} style={{ cursor: "pointer" }}><Icon name="X" size={15} color="var(--vn-muted)" /></span>
+            ) : (
+              <Icon name="ChevronDown" size={15} color="var(--vn-muted)" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -219,19 +256,29 @@ export default function SearchScreen() {
             </div>
 
             <button
-              onClick={(e) => { e.stopPropagation(); toggleFriend(u.id); }}
+              onClick={(e) => { e.stopPropagation(); handleFriendBtn(u); }}
               style={{
-                background: u.isFriend ? "rgba(46,204,113,0.12)" : "rgba(33,150,243,0.1)",
-                border: `1px solid ${u.isFriend ? "rgba(46,204,113,0.3)" : "rgba(33,150,243,0.25)"}`,
+                background: isFriend(u.id) ? "rgba(46,204,113,0.12)" : isPending(u.id) ? "var(--vn-card2)" : "rgba(33,150,243,0.1)",
+                border: `1px solid ${isFriend(u.id) ? "rgba(46,204,113,0.3)" : isPending(u.id) ? "var(--vn-border)" : "rgba(33,150,243,0.25)"}`,
                 borderRadius: "50px", padding: "0.35rem 0.7rem",
-                color: u.isFriend ? "#2ECC71" : "var(--vn-blue-bright)",
-                cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s", flexShrink: 0,
+                color: isFriend(u.id) ? "#2ECC71" : isPending(u.id) ? "var(--vn-muted)" : "var(--vn-blue-bright)",
+                cursor: "pointer", fontSize: "0.74rem", fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s", flexShrink: 0,
               }}>
-              {u.isFriend ? "✓ Друг" : "+ Добавить"}
+              {friendBtnLabel(u.id)}
             </button>
           </div>
         ))}
       </div>
+
+      {showCityPicker && (
+        <CityPicker value={cityFilter} onChange={setCityFilter} onClose={() => setShowCityPicker(false)} />
+      )}
+
+      {toast && (
+        <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "rgba(13,22,38,0.95)", color: "var(--vn-text)", borderRadius: "50px", padding: "0.55rem 1.2rem", fontSize: "0.82rem", fontWeight: 500, zIndex: 80, border: "1px solid var(--vn-border)", boxShadow: "0 4px 20px rgba(0,0,0,0.4)", backdropFilter: "blur(12px)", whiteSpace: "nowrap" }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

@@ -57,6 +57,19 @@ const EMOJI_CATEGORIES = [
 
 const REACTIONS_QUICK = ["❤️", "😂", "👍", "😮", "😢", "🔥", "🙏", "😍"];
 
+const CONTACTS = [
+  { name: "Ислам Дудаев", phone: "+7 928 111-22-33" },
+  { name: "Руслан Арсанов", phone: "+7 928 222-33-44" },
+  { name: "Зайнаб Хасанова", phone: "+7 928 333-44-55" },
+  { name: "Малика Садулаева", phone: "+7 928 444-55-66" },
+  { name: "Хеда Гайтаева", phone: "+7 928 555-66-77" },
+  { name: "Адам Берсанов", phone: "+7 928 666-77-88" },
+  { name: "Ахмед Мусаев", phone: "+7 928 777-88-99" },
+  { name: "Зарема Тагаева", phone: "+7 928 888-99-00" },
+];
+
+const CONTACT_COLORS = ["linear-gradient(135deg,#1565C0,#2196F3)", "linear-gradient(135deg,#1976D2,#42A5F5)", "linear-gradient(135deg,#0D47A1,#1976D2)", "linear-gradient(135deg,#1565C0,#29B6F6)"];
+
 const WALLPAPERS = [
   { id: "default", label: "По умолчанию", bg: "var(--vn-bg)" },
   { id: "mountains", label: "Горы", bg: "linear-gradient(160deg,#0D1626 0%,#1565C0 50%,#0D1626 100%)" },
@@ -95,7 +108,10 @@ export default function ChatView({ chat, user, onBack }: Props) {
   const [wallpaper, setWallpaper] = useState("default");
   const [chatCleared, setChatCleared] = useState(false);
 
-  // mic hold: short = voice, long (≥600ms) = circle
+  // mic: tap toggles circleMode (voice <-> video circle), hold records
+  const [circleMode, setCircleMode] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isCircle, setIsCircle] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -105,6 +121,7 @@ export default function ChatView({ chat, user, onBack }: Props) {
   const recordStartX = useRef(0);
   const recordSecondsRef = useRef(0);
   const micIsLong = useRef(false);
+  const micDidHold = useRef(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,29 +144,32 @@ export default function ChatView({ chat, user, onBack }: Props) {
     setMessages((prev) => [...prev, { ...msg, id: Date.now(), time: getNow(), reactions: [] }]);
   }, []);
 
-  // ── Mic: short tap = voice, long hold ≥ 600ms = circle ──
+  // ── Mic: TAP toggles mode (voice <-> video circle), HOLD records ──
   const onMicDown = useCallback((clientX: number) => {
-    micIsLong.current = false;
+    micDidHold.current = false;
     recordStartX.current = clientX;
+    // start recording only after a small hold delay (250ms) — a quick tap just toggles mode
     holdTimerRef.current = setTimeout(() => {
-      micIsLong.current = true;
-      setIsCircle(true);
+      micDidHold.current = true;
+      micIsLong.current = circleMode;
+      setIsCircle(circleMode);
       setIsRecording(true);
       setRecordSeconds(0);
       recordSecondsRef.current = 0;
       setRecordCancelled(false);
       recordTimerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
-    }, 600);
-    // also start voice timer immediately for short-tap fallback
-    setIsRecording(true);
-    setRecordSeconds(0);
-    recordSecondsRef.current = 0;
-    setRecordCancelled(false);
-    recordTimerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
-  }, []);
+    }, 250);
+  }, [circleMode]);
 
   const onMicUp = useCallback(() => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+
+    // quick tap (no hold) — just toggle voice/video-circle mode
+    if (!micDidHold.current) {
+      setCircleMode((m) => !m);
+      return;
+    }
+
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     const secs = recordSecondsRef.current;
     const cancelled = recordCancelled;
@@ -164,12 +184,21 @@ export default function ChatView({ chat, user, onBack }: Props) {
     setRecordSeconds(0);
     setRecordCancelled(false);
     micIsLong.current = false;
+    micDidHold.current = false;
   }, [recordCancelled]);
 
   const onMicMove = useCallback((clientX: number) => {
     if (!isRecording) return;
     setRecordCancelled(recordStartX.current - clientX > 55);
   }, [isRecording]);
+
+  // ── Send contact ──
+  const sendContact = (friend: { name: string; phone: string }) => {
+    pushMsg({ text: `👤 ${friend.name}\n${friend.phone}`, mine: true, type: "text" });
+    setShowContactPicker(false);
+    setContactSearch("");
+    setAttachOpen(false);
+  };
 
   // ── File pickers ──
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>, type: MsgType) => {
@@ -521,7 +550,7 @@ export default function ChatView({ chat, user, onBack }: Props) {
               { icon: "Music", label: "Аудио", color: "#42A5F5", action: () => audioInputRef.current?.click() },
               { icon: "FileText", label: "Документ", color: "#29B6F6", action: () => docInputRef.current?.click() },
               { icon: "MapPin", label: "Геолокация", color: "#2ECC71", action: () => { setAttachOpen(false); if (navigator.geolocation) { navigator.geolocation.getCurrentPosition((p) => pushMsg({ text: `📍 ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}`, mine: true, type: "text" }), () => pushMsg({ text: "📍 43.31700, 45.69890 (примерно)", mine: true, type: "text" })); } else { pushMsg({ text: "📍 43.31700, 45.69890 (примерно)", mine: true, type: "text" }); } } },
-              { icon: "UserCheck", label: "Контакт", color: "#FF9800", action: () => { setAttachOpen(false); pushMsg({ text: "👤 Ахмед Мусаев\n+7 928 123-45-67", mine: true, type: "text" }); } },
+              { icon: "UserCheck", label: "Контакт", color: "#FF9800", action: () => { setAttachOpen(false); setShowContactPicker(true); } },
             ].map((item) => (
               <button key={item.label} onClick={item.action}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.75rem 0.5rem", cursor: "pointer", transition: "all 0.2s" }}
@@ -586,14 +615,15 @@ export default function ChatView({ chat, user, onBack }: Props) {
             onPointerMove={(e) => onMicMove(e.clientX)}
             onPointerUp={onMicUp}
             onPointerCancel={() => { if (recordTimerRef.current) clearInterval(recordTimerRef.current); if (holdTimerRef.current) clearTimeout(holdTimerRef.current); setIsRecording(false); setIsCircle(false); setRecordSeconds(0); setRecordCancelled(false); }}
+            title={circleMode ? "Режим видеокружка — зажми для записи, нажми для переключения" : "Голосовое — зажми для записи, нажми для видеокружка"}
             style={{
-              background: isRecording ? (recordCancelled ? "rgba(150,150,150,0.15)" : isCircle ? "rgba(33,150,243,0.2)" : "rgba(231,76,60,0.15)") : "rgba(33,150,243,0.1)",
-              border: `2px solid ${isRecording ? (recordCancelled ? "rgba(150,150,150,0.3)" : isCircle ? "rgba(33,150,243,0.5)" : "rgba(231,76,60,0.45)") : "transparent"}`,
+              background: isRecording ? (recordCancelled ? "rgba(150,150,150,0.15)" : isCircle ? "rgba(33,150,243,0.2)" : "rgba(231,76,60,0.15)") : circleMode ? "rgba(33,150,243,0.2)" : "rgba(33,150,243,0.1)",
+              border: `2px solid ${isRecording ? (recordCancelled ? "rgba(150,150,150,0.3)" : isCircle ? "rgba(33,150,243,0.5)" : "rgba(231,76,60,0.45)") : circleMode ? "rgba(33,150,243,0.5)" : "transparent"}`,
               borderRadius: "50%", width: 38, height: 38,
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", flexShrink: 0, touchAction: "none", userSelect: "none", transition: "all 0.15s",
             }}>
-            <Icon name={isCircle ? "Video" : "Mic"} size={16} color={isRecording ? (recordCancelled ? "var(--vn-muted)" : isCircle ? "var(--vn-blue-bright)" : "#E74C3C") : "var(--vn-blue-bright)"} />
+            <Icon name={(isCircle || (circleMode && !isRecording)) ? "Video" : "Mic"} size={16} color={isRecording ? (recordCancelled ? "var(--vn-muted)" : isCircle ? "var(--vn-blue-bright)" : "#E74C3C") : "var(--vn-blue-bright)"} />
           </button>
         )}
       </div>
@@ -603,6 +633,46 @@ export default function ChatView({ chat, user, onBack }: Props) {
       <input ref={videoInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={(e) => handleFile(e, "video")} />
       <input ref={audioInputRef} type="file" accept="audio/*" style={{ display: "none" }} onChange={(e) => handleFile(e, "audio")} />
       <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar" style={{ display: "none" }} onChange={(e) => handleFile(e, "document")} />
+
+      {/* ── Contact picker ── */}
+      {showContactPicker && (
+        <div onClick={() => { setShowContactPicker(false); setContactSearch(""); }} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 90, display: "flex", alignItems: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--vn-card)", borderRadius: "1.5rem 1.5rem 0 0", width: "100%", height: "70%", display: "flex", flexDirection: "column", animation: "vn-appear 0.25s cubic-bezier(0.34,1.56,0.64,1)", overflow: "hidden" }}>
+            <div style={{ padding: "1rem 1.2rem 0.75rem", borderBottom: "1px solid var(--vn-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem" }}>
+                <h3 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.05rem" }}>Отправить контакт</h3>
+                <button onClick={() => { setShowContactPicker(false); setContactSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-muted)" }}>
+                  <Icon name="X" size={20} />
+                </button>
+              </div>
+              <div style={{ position: "relative" }}>
+                <Icon name="Search" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
+                <input className="vn-input" placeholder="Найти друга..." value={contactSearch} onChange={(e) => setContactSearch(e.target.value)} autoFocus style={{ paddingLeft: "2.6rem" }} />
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "0.5rem 0" }} className="scrollbar-hide">
+              {CONTACTS.filter((c) => c.name.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone.includes(contactSearch)).map((c, i) => (
+                <button key={c.name} onClick={() => sendContact(c)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "0.7rem 1.2rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.05)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: CONTACT_COLORS[i % CONTACT_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem", flexShrink: 0 }}>
+                    {c.name[0]}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.92rem" }}>{c.name}</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--vn-muted)" }}>{c.phone}</div>
+                  </div>
+                  <Icon name="Send" size={16} color="var(--vn-blue-bright)" />
+                </button>
+              ))}
+              {CONTACTS.filter((c) => c.name.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone.includes(contactSearch)).length === 0 && (
+                <div style={{ textAlign: "center", padding: "2rem", color: "var(--vn-muted)", fontSize: "0.9rem" }}>Контакт не найден</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Message long-press menu ── */}
       {msgMenu && (

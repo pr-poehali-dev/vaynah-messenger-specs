@@ -1,6 +1,9 @@
 import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
+import ChatView, { ChatData } from "./ChatView";
+import CallScreen from "./CallScreen";
+import CityPicker from "./CityPicker";
 
 interface Props {
   user: User;
@@ -168,6 +171,8 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [friendStates, setFriendStates] = useState<Record<number, boolean>>(
     Object.fromEntries(mockFriends.map((f) => [f.id, f.isFriend]))
   );
+  const [openChat, setOpenChat] = useState<ChatData | null>(null);
+  const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const saveEdit = () => {
@@ -191,6 +196,22 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const filteredRegions = RUSSIA_REGIONS.filter((r) =>
     r.toLowerCase().includes(regionSearch.toLowerCase())
   );
+
+  const otherChatData: ChatData | null = otherProfile
+    ? { id: 0, name: `${otherProfile.name} ${otherProfile.surname}`, avatar: otherProfile.avatar, online: otherProfile.online, city: otherProfile.city }
+    : null;
+
+  if (openChat) {
+    return <ChatView chat={openChat} user={user} onBack={() => setOpenChat(null)} />;
+  }
+
+  if (openCall) {
+    return (
+      <div style={{ position: "relative", height: "100%" }}>
+        <CallScreen type={openCall.type} name={openCall.chat.name} avatar={openCall.chat.avatar} onEnd={() => setOpenCall(null)} />
+      </div>
+    );
+  }
 
   const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
     <button
@@ -570,7 +591,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                 {isFriendNow ? "Удалить из друзей" : "Добавить в друзья"}
               </button>
               <button
-                onClick={() => setSection("main")}
+                onClick={() => otherChatData && setOpenChat(otherChatData)}
                 style={{
                   flex: "1 1 auto",
                   minWidth: 100,
@@ -595,6 +616,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
 
             <div style={{ display: "flex", gap: 10, marginTop: 10, width: "100%", justifyContent: "center" }}>
               <button
+                onClick={() => otherChatData && setOpenCall({ type: "audio", chat: otherChatData })}
                 style={{
                   flex: 1,
                   padding: "0.6rem 0.75rem",
@@ -615,6 +637,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                 Позвонить
               </button>
               <button
+                onClick={() => otherChatData && setOpenCall({ type: "video", chat: otherChatData })}
                 style={{
                   flex: 1,
                   padding: "0.6rem 0.75rem",

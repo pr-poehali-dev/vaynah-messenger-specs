@@ -2,6 +2,7 @@ import { useState } from "react";
 import { User } from "@/pages/Index";
 import Icon from "@/components/ui/icon";
 import func2url from "../../../backend/func2url.json";
+import CityPicker from "./CityPicker";
 
 interface Props {
   onContinue: () => void;
@@ -19,6 +20,7 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
   const [check2, setCheck2] = useState(false);
   const [check3, setCheck3] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
 
   const canContinue = name.trim() && surname.trim() && birthdate && city.trim() && check1 && check2 && check3;
 
@@ -128,16 +130,17 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--vn-muted)", marginBottom: "0.35rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
               Город *
             </label>
-            <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowCityPicker(true)}
+              className="vn-input"
+              style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, width: "100%", paddingLeft: "2.6rem", cursor: "pointer", textAlign: "left", background: "var(--vn-card2)" }}
+            >
               <Icon name="MapPin" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
-              <input
-                className="vn-input"
-                placeholder="Введи свой город"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                style={{ paddingLeft: "2.6rem" }}
-              />
-            </div>
+              <span style={{ flex: 1, color: city ? "var(--vn-text)" : "var(--vn-muted)", fontSize: "0.9rem" }}>
+                {city || "Выбери свой город"}
+              </span>
+              <Icon name="ChevronDown" size={16} color="var(--vn-muted)" />
+            </button>
           </div>
 
           {/* Checkboxes */}
@@ -206,6 +209,10 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
           {loading ? "Сохраняю..." : "Продолжить"}
         </button>
       </div>
+
+      {showCityPicker && (
+        <CityPicker value={city} onChange={setCity} onClose={() => setShowCityPicker(false)} />
+      )}
     </div>
   );
 }
