@@ -293,21 +293,48 @@ export default function ChatView({ chat, user, onBack }: Props) {
 
       {/* Attach menu */}
       {attachOpen && (
-        <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--vn-border)", background: "var(--vn-card)", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.5rem", animation: "vn-appear 0.2s ease" }}>
-          {[
-            { icon: "Image", label: "Фото", color: "#2196F3", ref: photoInputRef },
-            { icon: "Video", label: "Видео", color: "#1565C0", ref: videoInputRef },
-            { icon: "Music", label: "Аудио", color: "#42A5F5", ref: audioInputRef },
-            { icon: "FileText", label: "Документ", color: "#29B6F6", ref: docInputRef },
-          ].map((item) => (
-            <button key={item.label} onClick={() => item.ref.current?.click()}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.75rem 0.5rem", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--vn-blue-light)")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--vn-border)")}>
-              <Icon name={item.icon} size={22} color={item.color} />
-              <span style={{ fontSize: "0.7rem", color: "var(--vn-muted)" }}>{item.label}</span>
-            </button>
-          ))}
+        <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--vn-border)", background: "var(--vn-card)", animation: "vn-appear 0.2s ease" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.5rem" }}>
+            {[
+              { icon: "Image", label: "Фото", color: "#2196F3", action: () => photoInputRef.current?.click() },
+              { icon: "Video", label: "Видео", color: "#1565C0", action: () => videoInputRef.current?.click() },
+              { icon: "Music", label: "Аудио", color: "#42A5F5", action: () => audioInputRef.current?.click() },
+              { icon: "FileText", label: "Документ", color: "#29B6F6", action: () => docInputRef.current?.click() },
+              {
+                icon: "MapPin", label: "Геолокация", color: "#2ECC71",
+                action: () => {
+                  setAttachOpen(false);
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const lat = pos.coords.latitude.toFixed(5);
+                        const lng = pos.coords.longitude.toFixed(5);
+                        pushMsg({ text: `📍 Моё местоположение\n${lat}, ${lng}`, mine: true, type: "text" });
+                      },
+                      () => pushMsg({ text: "📍 Моё местоположение (примерно)\n43.31700, 45.69890", mine: true, type: "text" })
+                    );
+                  } else {
+                    pushMsg({ text: "📍 Моё местоположение (примерно)\n43.31700, 45.69890", mine: true, type: "text" });
+                  }
+                }
+              },
+              {
+                icon: "UserCheck", label: "Контакт", color: "#FF9800",
+                action: () => {
+                  setAttachOpen(false);
+                  pushMsg({ text: "👤 Контакт: Ахмед Мусаев\n+7 928 123-45-67", mine: true, type: "text" });
+                }
+              },
+            ].map((item) => (
+              <button key={item.label} onClick={item.action}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.75rem 0.5rem", cursor: "pointer", transition: "all 0.2s" }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--vn-blue-light)")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--vn-border)")}>
+                <Icon name={item.icon} size={22} color={item.color} />
+                <span style={{ fontSize: "0.68rem", color: "var(--vn-muted)", textAlign: "center" }}>{item.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -327,8 +354,8 @@ export default function ChatView({ chat, user, onBack }: Props) {
       {/* Input bar */}
       <div style={{ padding: "0.7rem 0.8rem", borderTop: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: "0.5rem", background: "var(--vn-card)" }}>
         <button onClick={() => setAttachOpen(!attachOpen)}
-          style={{ background: attachOpen ? "rgba(33,150,243,0.22)" : "rgba(33,150,243,0.1)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.2s" }}>
-          <Icon name="Paperclip" size={17} color="var(--vn-blue-bright)" />
+          style={{ background: attachOpen ? "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))" : "rgba(33,150,243,0.1)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.2s", transform: attachOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
+          <Icon name="Plus" size={19} color={attachOpen ? "white" : "var(--vn-blue-bright)"} />
         </button>
 
         <input className="vn-input" placeholder="Сообщение..." value={input}

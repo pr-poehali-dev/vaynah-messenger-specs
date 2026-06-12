@@ -70,48 +70,30 @@ export default function Index() {
         <div style={{ position: "absolute", top: "35%", left: "30%", width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.07) 0%, transparent 70%)" }} />
       </div>
 
-      {/* Theme switcher — top right */}
+      {/* Theme switcher — top right: single icon button */}
       <div style={{ position: "absolute", top: 14, right: 14, zIndex: 100 }}>
         <button
           onClick={toggleTheme}
+          title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
             background: "var(--vn-card2)",
             border: "1px solid var(--vn-border)",
-            borderRadius: "50px",
-            padding: "0.35rem 0.7rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             cursor: "pointer",
             transition: "all 0.2s",
             backdropFilter: "blur(12px)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            fontSize: "1.1rem",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          <span style={{ fontSize: "0.9rem" }}>{theme === "dark" ? "🌙" : "☀️"}</span>
-          <div
-            style={{
-              width: 32,
-              height: 17,
-              borderRadius: 9,
-              background: theme === "dark" ? "var(--vn-blue-light)" : "var(--vn-blue-bright)",
-              position: "relative",
-              transition: "background 0.25s",
-            }}
-          >
-            <div
-              style={{
-                width: 13,
-                height: 13,
-                borderRadius: "50%",
-                background: "white",
-                position: "absolute",
-                top: 2,
-                left: theme === "dark" ? 2 : 17,
-                transition: "left 0.25s",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              }}
-            />
-          </div>
+          {theme === "dark" ? "🌙" : "☀️"}
         </button>
       </div>
 
