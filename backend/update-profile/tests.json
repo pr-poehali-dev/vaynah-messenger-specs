@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Reject missing email",
+      "method": "POST",
+      "path": "/",
+      "body": {"name": "Ахмед"},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "Email обязателен"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

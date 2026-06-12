@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { User } from "@/pages/Index";
 import Icon from "@/components/ui/icon";
+import func2url from "../../../backend/func2url.json";
 
 interface Props {
   onContinue: () => void;
@@ -17,11 +18,24 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
   const [check1, setCheck1] = useState(false);
   const [check2, setCheck2] = useState(false);
   const [check3, setCheck3] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const canContinue = name.trim() && surname.trim() && birthdate && city.trim() && check1 && check2 && check3;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!canContinue) return;
+    setLoading(true);
+    try {
+      await fetch(func2url["update-profile"], {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim() }),
+      });
+    } catch {
+      // Продолжаем даже при ошибке сети — данные сохранены локально
+    } finally {
+      setLoading(false);
+    }
     setUser({ ...user, email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim() });
     onContinue();
   };
@@ -174,17 +188,22 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
         <button
           className="vn-btn"
           onClick={handleContinue}
+          disabled={loading}
           style={{
-            opacity: canContinue ? 1 : 0.45,
-            cursor: canContinue ? "pointer" : "not-allowed",
+            opacity: canContinue && !loading ? 1 : 0.45,
+            cursor: canContinue && !loading ? "pointer" : "not-allowed",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
           }}
         >
-          <Icon name="ArrowRight" size={17} color="white" />
-          Продолжить
+          {loading ? (
+            <div style={{ width: 18, height: 18, border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid white", borderRadius: "50%", animation: "vn-spin-slow 0.8s linear infinite" }} />
+          ) : (
+            <Icon name="ArrowRight" size={17} color="white" />
+          )}
+          {loading ? "Сохраняю..." : "Продолжить"}
         </button>
       </div>
     </div>
