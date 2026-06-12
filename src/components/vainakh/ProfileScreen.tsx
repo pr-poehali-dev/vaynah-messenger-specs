@@ -13,6 +13,7 @@ type ProfileSection =
   | "settings"
   | "edit"
   | "security"
+  | "privacy"
   | "notifications"
   | "appearance"
   | "messages"
@@ -151,7 +152,10 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [section, setSection] = useState<ProfileSection>("main");
   const [editData, setEditData] = useState({ ...user });
   const [hidePhone, setHidePhone] = useState(false);
+  const [hideOnline, setHideOnline] = useState(false);
+  const [hideLastSeen, setHideLastSeen] = useState(false);
   const [notifsOn, setNotifsOn] = useState(true);
+  const [notifVibration, setNotifVibration] = useState(true);
   const [showRead, setShowRead] = useState(true);
   const [whoCanMsg, setWhoCanMsg] = useState("all");
   const [twoFa, setTwoFa] = useState(false);
@@ -1134,6 +1138,15 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
             <span style={{ fontWeight: 500 }}>Уведомления</span>
             <Toggle on={notifsOn} onToggle={() => setNotifsOn(!notifsOn)} />
           </div>
+          {/* Vibration toggle */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 1rem", background: "var(--vn-card2)", borderRadius: "0.75rem", border: "1px solid var(--vn-border)", marginBottom: "1rem" }}>
+            <div>
+              <div style={{ fontWeight: 500, fontSize: "0.9rem" }}>Вибрация</div>
+              <div style={{ fontSize: "0.74rem", color: "var(--vn-muted)", marginTop: 2 }}>{notifVibration ? "Вибрация включена" : "Только звук"}</div>
+            </div>
+            <Toggle on={notifVibration} onToggle={() => setNotifVibration(!notifVibration)} />
+          </div>
+
           <p
             style={{
               fontSize: "0.75rem",
@@ -1144,7 +1157,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
               letterSpacing: "0.04em",
             }}
           >
-            Звук
+            Звук уведомлений
           </p>
           {["default", "chime", "pop", "none"].map((s) => (
             <button
@@ -1602,6 +1615,82 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
     );
   }
 
+  // ── PRIVACY ──
+  if (section === "privacy") {
+    const Toggle2 = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
+      <button onClick={onToggle} style={{ width: 46, height: 26, borderRadius: 13, background: on ? "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))" : "var(--vn-border)", border: "none", cursor: "pointer", position: "relative", transition: "all 0.25s", flexShrink: 0 }}>
+        <div style={{ width: 20, height: 20, borderRadius: "50%", background: "white", position: "absolute", top: 3, left: on ? 23 : 3, transition: "left 0.25s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }} />
+      </button>
+    );
+    return (
+      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
+          <button onClick={() => setSection("settings")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}><Icon name="ArrowLeft" size={22} /></button>
+          <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem" }}>Приватность</h2>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
+
+          {/* Phone */}
+          <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)" }}>
+            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.9rem" }}>Номер телефона</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0" }}>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: "0.9rem" }}>Скрыть номер телефона</div>
+                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>
+                  {hidePhone ? "Ваш номер не виден посторонним" : "Ваш номер виден друзьям"}
+                </div>
+              </div>
+              <Toggle2 on={hidePhone} onToggle={() => setHidePhone(!hidePhone)} />
+            </div>
+          </div>
+
+          {/* Online */}
+          <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)" }}>
+            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.9rem" }}>Статус в сети</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: "0.9rem" }}>Скрыть статус «онлайн»</div>
+                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>
+                  {hideOnline ? "Никто не видит, что вы в сети" : "Друзья видят, что вы онлайн"}
+                </div>
+              </div>
+              <Toggle2 on={hideOnline} onToggle={() => setHideOnline(!hideOnline)} />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0" }}>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: "0.9rem" }}>Скрыть «был(а) в сети»</div>
+                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>
+                  {hideLastSeen ? "Никто не видит время последнего визита" : "Друзья видят время последнего входа"}
+                </div>
+              </div>
+              <Toggle2 on={hideLastSeen} onToggle={() => setHideLastSeen(!hideLastSeen)} />
+            </div>
+          </div>
+
+          {/* Who can message */}
+          <div style={{ padding: "1rem 1.2rem" }}>
+            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.9rem" }}>Кто может писать мне</p>
+            {[{ id: "all", label: "Все пользователи", desc: "Любой может начать диалог" }, { id: "friends", label: "Только друзья", desc: "Сообщения только от людей из вашего списка" }, { id: "none", label: "Никто", desc: "Новые диалоги отключены" }].map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setWhoCanMsg(opt.id)}
+                style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "0.75rem 0", background: "none", border: "none", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "left" }}
+              >
+                <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${whoCanMsg === opt.id ? "var(--vn-blue-light)" : "var(--vn-border)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {whoCanMsg === opt.id && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--vn-blue-light)" }} />}
+                </div>
+                <div>
+                  <div style={{ fontWeight: whoCanMsg === opt.id ? 600 : 400, fontSize: "0.9rem", color: whoCanMsg === opt.id ? "var(--vn-text)" : "var(--vn-muted)" }}>{opt.label}</div>
+                  <div style={{ fontSize: "0.74rem", color: "var(--vn-muted)", marginTop: 1 }}>{opt.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── SETTINGS ──
   if (section === "settings") {
     return (
@@ -1630,26 +1719,11 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
           </h2>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-          <SettingRow
-            icon="Bell"
-            label="Уведомления"
-            onClick={() => setSection("notifications")}
-          />
-          <SettingRow
-            icon="ShieldCheck"
-            label="Безопасность"
-            onClick={() => setSection("security")}
-          />
-          <SettingRow
-            icon="MessageSquare"
-            label="Сообщения"
-            onClick={() => setSection("messages")}
-          />
-          <SettingRow
-            icon="HardDrive"
-            label="Медиа и память"
-            onClick={() => setSection("storage")}
-          />
+          <SettingRow icon="Bell" label="Уведомления" onClick={() => setSection("notifications")} />
+          <SettingRow icon="Eye" label="Приватность" onClick={() => setSection("privacy")} />
+          <SettingRow icon="ShieldCheck" label="Безопасность" onClick={() => setSection("security")} />
+          <SettingRow icon="MessageSquare" label="Сообщения" onClick={() => setSection("messages")} />
+          <SettingRow icon="HardDrive" label="Медиа и память" onClick={() => setSection("storage")} />
           <SettingRow
             icon="Bookmark"
             label="Избранное"

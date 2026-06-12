@@ -61,11 +61,19 @@ export default function ChatsScreen({ user }: Props) {
   const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [menuChat, setMenuChat] = useState<Chat | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Chat | null>(null);
+  const [confirmClear, setConfirmClear] = useState<Chat | null>(null);
   const [viewProfile, setViewProfile] = useState<UserProfileData | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [plusMenuPos, setPlusMenuPos] = useState({ top: 0, right: 0 });
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   // Long-press detection
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,14 +104,17 @@ export default function ChatsScreen({ user }: Props) {
   const updateChat = (id: number, patch: Partial<Chat>) =>
     setChats((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
 
-  const deleteChat = (id: number) => {
+  const deleteChat = (id: number, forBoth: boolean) => {
     setChats((prev) => prev.filter((c) => c.id !== id));
-    setMenuChat(null);
+    setConfirmDelete(null);
+    showToast(forBoth ? "Чат удалён у вас и собеседника" : "Чат удалён у вас");
   };
 
   const clearChat = (id: number) => {
     updateChat(id, { lastMsg: "", unread: 0 });
+    setConfirmClear(null);
     setMenuChat(null);
+    showToast("История чата очищена");
   };
 
   const pinChat = (id: number) => {
@@ -388,8 +399,8 @@ export default function ChatsScreen({ user }: Props) {
             {[
               { icon: menuChat.pinned ? "PinOff" : "Pin", label: menuChat.pinned ? "Открепить" : "Закрепить", action: () => pinChat(menuChat.id), color: "var(--vn-blue-bright)" },
               { icon: menuChat.muted ? "Bell" : "BellOff", label: menuChat.muted ? "Включить звук" : "Отключить звук", action: () => muteChat(menuChat.id), color: "var(--vn-blue-bright)" },
-              { icon: "Eraser", label: "Очистить чат", action: () => clearChat(menuChat.id), color: "var(--vn-muted)" },
-              { icon: "Trash2", label: "Удалить чат", action: () => deleteChat(menuChat.id), color: "#E74C3C" },
+              { icon: "Eraser", label: "Очистить чат", action: () => { setConfirmClear(menuChat); setMenuChat(null); }, color: "var(--vn-muted)" },
+              { icon: "Trash2", label: "Удалить чат", action: () => { setConfirmDelete(menuChat); setMenuChat(null); }, color: "#E74C3C" },
             ].map((item) => (
               <button
                 key={item.label}
@@ -405,6 +416,90 @@ export default function ChatsScreen({ user }: Props) {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── Confirm CLEAR ── */}
+      {confirmClear && (
+        <div onClick={() => setConfirmClear(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--vn-card)", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.5rem", width: "100%", animation: "vn-appear 0.2s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.75rem" }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: AVATAR_COLORS[chats.findIndex((c) => c.id === confirmClear.id) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
+                {confirmClear.avatar}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{confirmClear.name}</div>
+              </div>
+            </div>
+            <h3 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>Очистить историю чата?</h3>
+            <p style={{ color: "var(--vn-muted)", fontSize: "0.85rem", marginBottom: "1.2rem" }}>
+              Все сообщения исчезнут только у вас. У собеседника переписка останется.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button onClick={() => setConfirmClear(null)} style={{ flex: 1, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.85rem", color: "var(--vn-text)", cursor: "pointer", fontWeight: 600, fontSize: "0.9rem" }}>
+                Отмена
+              </button>
+              <button onClick={() => clearChat(confirmClear.id)} style={{ flex: 1, background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "none", borderRadius: "0.75rem", padding: "0.85rem", color: "white", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem" }}>
+                Очистить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm DELETE ── */}
+      {confirmDelete && (
+        <div onClick={() => setConfirmDelete(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--vn-card)", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.5rem", width: "100%", animation: "vn-appear 0.2s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.75rem" }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: AVATAR_COLORS[chats.findIndex((c) => c.id === confirmDelete.id) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
+                {confirmDelete.avatar}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700 }}>{confirmDelete.name}</div>
+              </div>
+            </div>
+            <h3 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>Удалить чат?</h3>
+            <p style={{ color: "var(--vn-muted)", fontSize: "0.85rem", marginBottom: "1.2rem" }}>
+              Вернуть нельзя. Выберите, у кого удалить переписку.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+              <button
+                onClick={() => deleteChat(confirmDelete.id, false)}
+                style={{ width: "100%", background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.85rem", color: "var(--vn-text)", cursor: "pointer", fontWeight: 500, fontSize: "0.9rem", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+              >
+                <Icon name="User" size={16} color="var(--vn-muted)" />
+                Удалить только у меня
+              </button>
+              <button
+                onClick={() => deleteChat(confirmDelete.id, true)}
+                style={{ width: "100%", background: "rgba(231,76,60,0.1)", border: "1px solid rgba(231,76,60,0.35)", borderRadius: "0.75rem", padding: "0.85rem", color: "#E74C3C", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+              >
+                <Icon name="Users" size={16} color="#E74C3C" />
+                Удалить у всех участников
+              </button>
+              <button onClick={() => setConfirmDelete(null)} style={{ width: "100%", background: "none", border: "none", padding: "0.6rem", color: "var(--vn-muted)", cursor: "pointer", fontSize: "0.9rem" }}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div style={{
+          position: "absolute", bottom: 80, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(13,22,38,0.95)", color: "var(--vn-text)",
+          borderRadius: "50px", padding: "0.55rem 1.2rem",
+          fontSize: "0.82rem", fontWeight: 500, zIndex: 70,
+          border: "1px solid var(--vn-border)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          animation: "vn-appear 0.2s ease",
+          whiteSpace: "nowrap",
+          backdropFilter: "blur(12px)",
+        }}>
+          {toast}
         </div>
       )}
     </div>
