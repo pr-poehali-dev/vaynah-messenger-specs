@@ -32,7 +32,7 @@ export default function MainApp({ user, setUser, onLogout, theme, toggleTheme }:
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        {activeTab === "search" && <SearchScreen theme={theme} toggleTheme={toggleTheme} />}
+        {activeTab === "search" && <SearchScreen theme={theme} toggleTheme={toggleTheme} currentUser={user} />}
         {activeTab === "chats" && <ChatsScreen user={user} />}
         {activeTab === "statuses" && <StatusesScreen user={user} />}
         {activeTab === "notifications" && <NotificationsScreen />}

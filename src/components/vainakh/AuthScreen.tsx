@@ -2,8 +2,18 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import func2url from "../../../backend/func2url.json";
 
+interface UserData {
+  id?: number;
+  name?: string;
+  surname?: string;
+  city?: string;
+  birthdate?: string;
+  about?: string;
+  phone?: string;
+}
+
 interface Props {
-  onLogin: (email: string) => void;
+  onLogin: (email: string, userData?: UserData) => void;
 }
 
 const MAIL_DOMAINS = ["mail.ru", "inbox.ru", "list.ru", "bk.ru"];
@@ -85,7 +95,7 @@ export default function AuthScreen({ onLogin }: Props) {
       });
       const data = await res.json();
       if (data.ok) {
-        onLogin(email.trim().toLowerCase());
+        onLogin(email.trim().toLowerCase(), data.user);
       } else {
         setError(data.error || "Неверный код");
         setCode(["", "", "", ""]);
@@ -120,7 +130,7 @@ export default function AuthScreen({ onLogin }: Props) {
             body: JSON.stringify({ email: email.trim().toLowerCase(), code: fullCode }),
           });
           const data = await res.json();
-          if (data.ok) onLogin(email.trim().toLowerCase());
+          if (data.ok) onLogin(email.trim().toLowerCase(), data.user);
           else { setError(data.error || "Неверный код"); setCode(["", "", "", ""]); inputRefs[0].current?.focus(); }
         } catch {
           setError("Нет соединения.");

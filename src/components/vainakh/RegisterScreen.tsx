@@ -5,7 +5,7 @@ import func2url from "../../../backend/func2url.json";
 import CityPicker from "./CityPicker";
 
 interface Props {
-  onContinue: () => void;
+  onContinue: (userData?: Partial<User>) => void;
   user: User;
   setUser: (u: User) => void;
   email: string;
@@ -39,8 +39,9 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
     } finally {
       setLoading(false);
     }
-    setUser({ ...user, email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim(), about: about.trim() });
-    onContinue();
+    const userData = { email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim(), about: about.trim() };
+    setUser({ ...user, ...userData });
+    onContinue(userData);
   };
 
   const checks = [

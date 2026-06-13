@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import ChatView, { ChatData } from "./ChatView";
 import CallScreen from "./CallScreen";
 import CityPicker from "./CityPicker";
 import { useFriends, Person } from "./useFriends";
 import { User } from "@/pages/Index";
+import func2url from "../../../backend/func2url.json";
 
 interface SearchUser {
   id: number;
@@ -17,18 +18,8 @@ interface SearchUser {
   friends: string[];
   status: string;
   online: boolean;
+  email: string;
 }
-
-const allUsers: SearchUser[] = [
-  { id: 1, name: "Зайнаб", surname: "Хасанова", city: "Грозный", age: 22, avatar: "З", isBlocked: false, friends: ["Ислам", "Малика", "Руслан"], status: "На прогулке 🌿", online: true },
-  { id: 2, name: "Ислам", surname: "Дудаев", city: "Гудермес", age: 28, avatar: "И", isBlocked: false, friends: ["Зайнаб", "Ахмед"], status: "Работаю 💼", online: true },
-  { id: 3, name: "Малика", surname: "Садулаева", city: "Грозный", age: 25, avatar: "М", isBlocked: false, friends: ["Руслан"], status: "Хороший день ☀️", online: false },
-  { id: 4, name: "Руслан", surname: "Арсанов", city: "Шали", age: 31, avatar: "Р", isBlocked: false, friends: ["Ислам", "Малика"], status: "", online: false },
-  { id: 5, name: "Хеда", surname: "Гайтаева", city: "Аргун", age: 19, avatar: "Х", isBlocked: false, friends: ["Зайнаб"], status: "Алхамдулиллах 🙏", online: true },
-  { id: 6, name: "Адам", surname: "Берсанов", city: "Грозный", age: 24, avatar: "А", isBlocked: false, friends: [], status: "В пути 🚗", online: false },
-  { id: 7, name: "Айна", surname: "Умарова", city: "Грозный", age: 21, avatar: "А", isBlocked: false, friends: ["Малика"], status: "Слушаю музыку 🎵", online: true },
-  { id: 8, name: "Лема", surname: "Хаджиев", city: "Гудермес", age: 33, avatar: "Л", isBlocked: false, friends: ["Руслан"], status: "", online: false },
-];
 
 function toPerson(u: SearchUser): Person {
   return { id: u.id, name: u.name, surname: u.surname, city: u.city, age: u.age, avatar: u.avatar, online: u.online, status: u.status, mutualFriends: u.friends };
@@ -50,14 +41,41 @@ const dummyUser: User = { email: "", name: "", surname: "", city: "", phone: "",
 interface Props {
   theme?: "dark" | "light";
   toggleTheme?: () => void;
+  currentUser?: User;
 }
 
-export default function SearchScreen({ theme = "dark", toggleTheme }: Props) {
+export default function SearchScreen({ theme = "dark", toggleTheme, currentUser }: Props) {
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [showCityPicker, setShowCityPicker] = useState(false);
-  const [users, setUsers] = useState(allUsers);
+  const [users, setUsers] = useState<SearchUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
+
+  useEffect(() => {
+    const email = currentUser?.email || "";
+    fetch(`${func2url["get-users"]}?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          const mapped: SearchUser[] = data.users.map((u: { id: number; name: string; surname: string; city: string; about: string; online: boolean; avatar: string; email: string }) => ({
+            id: u.id,
+            name: u.name,
+            surname: u.surname,
+            city: u.city,
+            age: 0,
+            avatar: u.avatar,
+            isBlocked: false,
+            friends: [],
+            status: u.about || "",
+            online: u.online,
+            email: u.email,
+          }));
+          setUsers(mapped);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [currentUser?.email]);
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -121,7 +139,7 @@ export default function SearchScreen({ theme = "dark", toggleTheme }: Props) {
           </div>
           <div style={{ paddingTop: "2.8rem", padding: "2.8rem 1.2rem 1.2rem", textAlign: "center" }}>
             <h2 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.4rem" }}>{selectedUser.name} {selectedUser.surname}</h2>
-            <p style={{ color: "var(--vn-muted)", fontSize: "0.84rem", marginTop: 4 }}>{selectedUser.age} лет · {selectedUser.city}</p>
+            <p style={{ color: "var(--vn-muted)", fontSize: "0.84rem", marginTop: 4 }}>{selectedUser.city}</p>
             {selectedUser.status && <p style={{ color: "var(--vn-blue-bright)", fontSize: "0.85rem", marginTop: 6, fontStyle: "italic" }}>{selectedUser.status}</p>}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: selectedUser.online ? "#2ECC71" : "var(--vn-muted)" }} />
@@ -174,20 +192,7 @@ export default function SearchScreen({ theme = "dark", toggleTheme }: Props) {
           <div style={{ padding: "0 1.2rem 1.5rem" }}>
             <p style={{ fontSize: "0.75rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.65rem" }}>Общие друзья</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {selectedUser.friends.map((f, i) => {
-                const found = allUsers.find((au) => au.name === f);
-                return (
-                  <button
-                    key={i}
-                    onClick={() => found && setSelectedUser(found)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "50px", padding: "0.3rem 0.7rem", cursor: found ? "pointer" : "default" }}
-                  >
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "white" }}>{f[0]}</div>
-                    <span style={{ fontSize: "0.82rem" }}>{f}</span>
-                  </button>
-                );
-              })}
-              {selectedUser.friends.length === 0 && <span style={{ fontSize: "0.82rem", color: "var(--vn-muted)" }}>Нет общих</span>}
+                <span style={{ fontSize: "0.82rem", color: "var(--vn-muted)" }}>Нет общих</span>
             </div>
           </div>
         </div>
@@ -255,7 +260,11 @@ export default function SearchScreen({ theme = "dark", toggleTheme }: Props) {
           )}
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+            <p>Загружаем пользователей...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
             <Icon name="SearchX" size={40} color="var(--vn-muted)" />
             <p style={{ marginTop: "1rem" }}>Никого не найдено</p>
@@ -277,7 +286,7 @@ export default function SearchScreen({ theme = "dark", toggleTheme }: Props) {
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{u.name} {u.surname}</div>
-              <div style={{ fontSize: "0.78rem", color: "var(--vn-muted)", marginTop: 1 }}>{u.age} лет · {u.city}</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--vn-muted)", marginTop: 1 }}>{u.city}</div>
               {u.status && <div style={{ fontSize: "0.76rem", color: "var(--vn-blue-bright)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.status}</div>}
             </div>
 

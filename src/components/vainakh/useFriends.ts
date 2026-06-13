@@ -24,17 +24,9 @@ interface FriendsState {
   outgoingIds: number[];
 }
 
-const initialFriends: Person[] = [
-  { id: 2, name: "Ислам", surname: "Дудаев", city: "Гудермес", age: 28, avatar: "И", online: true, status: "Работаю 💼", mutualFriends: ["Зайнаб", "Ахмед"] },
-  { id: 4, name: "Руслан", surname: "Арсанов", city: "Шали", age: 31, avatar: "Р", online: false, status: "", mutualFriends: ["Ислам", "Малика"] },
-  { id: 9, name: "Зарема", surname: "Тагаева", city: "Назрань", age: 26, avatar: "З", online: true, status: "Дома 🏠", mutualFriends: ["Хеда"] },
-];
-
 let state: FriendsState = {
-  friends: initialFriends,
-  incomingRequests: [
-    { id: 101, person: { id: 5, name: "Хеда", surname: "Гайтаева", city: "Аргун", age: 19, avatar: "Х", online: true, status: "Алхамдулиллах 🙏", mutualFriends: ["Зайнаб"] }, time: "12:00" },
-  ],
+  friends: [],
+  incomingRequests: [],
   outgoingIds: [],
 };
 

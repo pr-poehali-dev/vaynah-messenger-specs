@@ -6,6 +6,7 @@ import MainApp from "@/components/vainakh/MainApp";
 export type AppScreen = "auth" | "register" | "app";
 
 export interface User {
+  id?: number;
   email: string;
   name: string;
   surname: string;
@@ -31,10 +32,31 @@ const defaultUser: User = {
 
 export type Theme = "dark" | "light";
 
+const SESSION_KEY = "vainakh_session";
+
+function loadSession(): { user: User; screen: AppScreen } | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(user: User, screen: AppScreen) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ user, screen }));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
 export default function Index() {
-  const [screen, setScreen] = useState<AppScreen>("auth");
-  const [user, setUser] = useState<User>(defaultUser);
-  const [loginEmail, setLoginEmail] = useState("");
+  const saved = loadSession();
+  const [screen, setScreen] = useState<AppScreen>(saved?.screen === "app" ? "app" : "auth");
+  const [user, setUser] = useState<User>(saved?.user ?? defaultUser);
+  const [loginEmail, setLoginEmail] = useState(saved?.user?.email ?? "");
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
@@ -42,6 +64,13 @@ export default function Index() {
     if (theme === "light") root.classList.add("theme-light");
     else root.classList.remove("theme-light");
   }, [theme]);
+
+  // Сохраняем сессию при каждом изменении
+  useEffect(() => {
+    if (screen === "app" && user.email) {
+      saveSession(user, screen);
+    }
+  }, [screen, user]);
 
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
@@ -68,16 +97,27 @@ export default function Index() {
       <div style={{ position: "relative", zIndex: 1, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {screen === "auth" && (
           <AuthScreen
-            onLogin={(email) => {
+            onLogin={(email, userData) => {
               setLoginEmail(email);
-              setUser((u) => ({ ...u, email }));
-              setScreen("register");
+              const u = { ...defaultUser, ...userData, email };
+              setUser(u);
+              if (userData?.name) {
+                setScreen("app");
+                saveSession(u, "app");
+              } else {
+                setScreen("register");
+              }
             }}
           />
         )}
         {screen === "register" && (
           <RegisterScreen
-            onContinue={() => setScreen("app")}
+            onContinue={(userData) => {
+              const u = { ...user, ...userData };
+              setUser(u);
+              setScreen("app");
+              saveSession(u, "app");
+            }}
             user={user}
             setUser={setUser}
             email={loginEmail}
@@ -86,10 +126,14 @@ export default function Index() {
         {screen === "app" && (
           <MainApp
             user={user}
-            setUser={setUser}
+            setUser={(u) => {
+              setUser(u);
+              saveSession(u, "app");
+            }}
             theme={theme}
             toggleTheme={toggleTheme}
             onLogout={() => {
+              clearSession();
               setScreen("auth");
               setUser({ ...defaultUser });
               setLoginEmail("");
