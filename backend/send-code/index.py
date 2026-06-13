@@ -61,9 +61,9 @@ def handler(event: dict, context) -> dict:
 
     # Безопасно читаем порт
     try:
-        smtp_port = int(os.environ.get("SMTP_PORT", "465"))
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     except (ValueError, TypeError):
-        smtp_port = 465
+        smtp_port = 587
 
     # Если SMTP не настроен полностью — dev режим
     if not smtp_user or not smtp_password or not smtp_host:
