@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import ChatView, { ChatData } from "./ChatView";
 import CallScreen from "./CallScreen";
@@ -14,6 +14,7 @@ interface SearchUser {
   city: string;
   age: number;
   avatar: string;
+  avatar_url?: string;
   isBlocked: boolean;
   friends: string[];
   status: string;
@@ -54,33 +55,36 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
   const [friendIds, setFriendIds] = useState<number[]>([]);
   const [pendingIds, setPendingIds] = useState<number[]>([]);
 
-  useEffect(() => {
+  const loadUsers = useCallback(() => {
     const email = currentUser?.email || "";
-    console.log("[Search] loading users, email=", email);
     fetch(`${func2url["get-users"]}?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((data) => {
-        console.log("[Search] got data:", data.ok, data.users?.length);
-        if (data.ok) {
-          const mapped: SearchUser[] = data.users.map((u: { id: number; name: string; surname: string; city: string; about: string; online: boolean; avatar: string; email: string }) => ({
+        if (data.ok && Array.isArray(data.users)) {
+          setUsers(data.users.map((u: { id: number; name: string; surname: string; city: string; about: string; online: boolean; avatar: string; email: string; avatar_url?: string }) => ({
             id: u.id,
-            name: u.name,
-            surname: u.surname,
-            city: u.city,
+            name: u.name || "",
+            surname: u.surname || "",
+            city: u.city || "",
             age: 0,
-            avatar: u.avatar,
+            avatar: u.avatar || (u.name || "?")[0].toUpperCase(),
+            avatar_url: u.avatar_url || "",
             isBlocked: false,
             friends: [],
             status: u.about || "",
-            online: u.online,
-            email: u.email,
-          }));
-          setUsers(mapped);
+            online: u.online || false,
+            email: u.email || "",
+          })));
         }
       })
-      .catch((e) => console.error("[Search] fetch error:", e))
       .finally(() => setLoading(false));
   }, [currentUser?.email]);
+
+  useEffect(() => {
+    loadUsers();
+    const t = setInterval(loadUsers, 30000);
+    return () => clearInterval(t);
+  }, [loadUsers]);
 
   useEffect(() => {
     if (!currentUser?.email) return;
@@ -311,8 +315,8 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
           >
             {/* Avatar */}
             <div style={{ position: "relative", flexShrink: 0 }}>
-              <div style={{ width: 50, height: 50, borderRadius: "50%", background: avatarColors[u.id % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
-                {u.avatar}
+              <div style={{ width: 50, height: 50, borderRadius: "50%", background: u.avatar_url ? "none" : avatarColors[u.id % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem", overflow: "hidden" }}>
+                {u.avatar_url ? <img src={u.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : u.avatar}
               </div>
               {u.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
             </div>
