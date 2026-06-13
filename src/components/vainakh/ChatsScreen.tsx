@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 import ChatView, { ChatData } from "./ChatView";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 
 interface Chat {
   id: number;

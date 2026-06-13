@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { User } from "@/pages/Index";
 import Icon from "@/components/ui/icon";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 import CityPicker from "./CityPicker";
 
 interface Props {

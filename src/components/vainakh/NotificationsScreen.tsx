@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#1565C0,#2196F3)",

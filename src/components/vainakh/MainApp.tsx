@@ -6,7 +6,7 @@ import StatusesScreen from "./StatusesScreen";
 import ProfileScreen from "./ProfileScreen";
 import NotificationsScreen from "./NotificationsScreen";
 import { User, Theme } from "@/pages/Index";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 
 class TabBoundary extends Component<{ name: string; children: ReactNode }, { err: string | null }> {
   constructor(p: { name: string; children: ReactNode }) { super(p); this.state = { err: null }; }

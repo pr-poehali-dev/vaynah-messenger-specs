@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 import CallScreen from "./CallScreen";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

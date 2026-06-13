@@ -5,7 +5,7 @@ import CallScreen from "./CallScreen";
 import CityPicker from "./CityPicker";
 
 import { User } from "@/pages/Index";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 
 interface SearchUser {
   id: number;

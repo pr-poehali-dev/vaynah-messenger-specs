@@ -4,7 +4,7 @@ import { User } from "@/pages/Index";
 import ChatView, { ChatData } from "./ChatView";
 import CallScreen from "./CallScreen";
 import CityPicker from "./CityPicker";
-import func2url from "../../../backend/func2url.json";
+import func2url from "@/api";
 
 interface Props {
   user: User;
