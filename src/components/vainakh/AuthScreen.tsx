@@ -63,19 +63,21 @@ export default function AuthScreen({ onLogin }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string; dev_code?: string } = {};
+      try { data = JSON.parse(text); } catch { data = {}; }
       if (data.ok) {
         setStep("code");
         setCountdown(60);
         setCode(["", "", "", ""]);
-        // В dev-режиме показываем код (когда SMTP не настроен)
         if (data.dev_code) setDevCode(data.dev_code);
         else setDevCode(null);
         setTimeout(() => inputRefs[0].current?.focus(), 100);
       } else {
-        setError(data.error || "Ошибка отправки");
+        setError(data.error || `Ошибка ${res.status}. Попробуйте ещё раз.`);
       }
-    } catch {
+    } catch (e) {
+      console.error("[sendCode] network error:", e);
       setError("Нет соединения. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
@@ -93,15 +95,18 @@ export default function AuthScreen({ onLogin }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), code: fullCode }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string; user?: object } = {};
+      try { data = JSON.parse(text); } catch { data = {}; }
       if (data.ok) {
         onLogin(email.trim().toLowerCase(), data.user);
       } else {
-        setError(data.error || "Неверный код");
+        setError(data.error || `Ошибка ${res.status}. Попробуйте ещё раз.`);
         setCode(["", "", "", ""]);
         inputRefs[0].current?.focus();
       }
-    } catch {
+    } catch (e) {
+      console.error("[verifyCode] network error:", e);
       setError("Нет соединения. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
@@ -129,10 +134,13 @@ export default function AuthScreen({ onLogin }: Props) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: email.trim().toLowerCase(), code: fullCode }),
           });
-          const data = await res.json();
+          const text = await res.text();
+          let data: { ok?: boolean; error?: string; user?: object } = {};
+          try { data = JSON.parse(text); } catch { data = {}; }
           if (data.ok) onLogin(email.trim().toLowerCase(), data.user);
-          else { setError(data.error || "Неверный код"); setCode(["", "", "", ""]); inputRefs[0].current?.focus(); }
-        } catch {
+          else { setError(data.error || `Ошибка ${res.status}`); setCode(["", "", "", ""]); inputRefs[0].current?.focus(); }
+        } catch (e) {
+          console.error("[autoVerify] network error:", e);
           setError("Нет соединения.");
         } finally {
           setLoading(false);
