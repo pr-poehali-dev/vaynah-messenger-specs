@@ -56,9 +56,11 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
 
   useEffect(() => {
     const email = currentUser?.email || "";
+    console.log("[Search] loading users, email=", email);
     fetch(`${func2url["get-users"]}?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((data) => {
+        console.log("[Search] got data:", data.ok, data.users?.length);
         if (data.ok) {
           const mapped: SearchUser[] = data.users.map((u: { id: number; name: string; surname: string; city: string; about: string; online: boolean; avatar: string; email: string }) => ({
             id: u.id,
@@ -76,6 +78,7 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
           setUsers(mapped);
         }
       })
+      .catch((e) => console.error("[Search] fetch error:", e))
       .finally(() => setLoading(false));
   }, [currentUser?.email]);
 
