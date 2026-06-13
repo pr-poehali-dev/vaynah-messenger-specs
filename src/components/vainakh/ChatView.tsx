@@ -24,15 +24,7 @@ interface Message {
   selected?: boolean;
 }
 
-const initialMessages: Message[] = [
-  { id: 1, text: "Ассаламу алейкум! 🙏", mine: false, time: "14:20", type: "text", reactions: [] },
-  { id: 2, text: "Ваалейкум Ассалам! Как дела?", mine: true, time: "14:21", type: "text", reactions: [{ emoji: "❤️", count: 1, mine: false }] },
-  { id: 3, text: "Всё отлично, готовлюсь к поездке в горы. Там такая красота!", mine: false, time: "14:22", type: "text", reactions: [] },
-  { id: 4, text: "", mine: false, time: "14:23", type: "voice", duration: "0:24", reactions: [] },
-  { id: 5, text: "Хорошо! Увидимся завтра 👋", mine: true, time: "14:32", type: "text", readBy: ["Зайнаб"], reactions: [] },
-  { id: 6, text: "Посмотри какой вид!", mine: false, time: "14:40", type: "image", fileName: "photo.jpg", reactions: [{ emoji: "😍", count: 2, mine: true }] },
-  { id: 7, text: "Слушай, вот ссылка на карту: https://maps.google.com/maps?q=Грозный", mine: false, time: "14:45", type: "text", reactions: [] },
-];
+
 
 export interface ChatData {
   id: number;

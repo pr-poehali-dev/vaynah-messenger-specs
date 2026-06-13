@@ -182,9 +182,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [showRegionSheet, setShowRegionSheet] = useState(false);
   const [regionSearch, setRegionSearch] = useState("");
   const [otherProfile, setOtherProfile] = useState<OtherProfile | null>(null);
-  const [friendStates, setFriendStates] = useState<Record<number, boolean>>(
-    Object.fromEntries(mockFriends.map((f) => [f.id, f.isFriend]))
-  );
+  const [friendStates, setFriendStates] = useState<Record<number, boolean>>({});
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -194,15 +192,15 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
     setSection("main");
   };
 
-  const openOtherProfile = (f: (typeof mockFriends)[0]) => {
+  const openOtherProfile = (f: RealFriend) => {
     setOtherProfile({
       name: f.name,
       surname: f.surname,
       avatar: f.avatar,
       city: f.city,
-      birthdate: f.birthdate,
+      birthdate: "",
       online: f.online,
-      isFriend: friendStates[f.id] ?? f.isFriend,
+      isFriend: true,
     });
     setSection("other-profile");
   };
@@ -396,19 +394,11 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   // ── OTHER PROFILE ──
   if (section === "other-profile" && otherProfile) {
     const age = calcAge(otherProfile.birthdate);
-    const mutualFriends = mockFriends.slice(0, 3);
-    const isFriendNow = friendStates[
-      mockFriends.find(
-        (f) => f.name === otherProfile.name && f.surname === otherProfile.surname
-      )?.id ?? -1
-    ] ?? otherProfile.isFriend;
-    const profileIdx = mockFriends.findIndex(
-      (f) => f.name === otherProfile.name && f.surname === otherProfile.surname
-    );
+    const mutualFriends: RealFriend[] = [];
+    const isFriendNow = otherProfile.isFriend;
 
     const toggleFriend = () => {
-      if (profileIdx === -1) return;
-      const fId = mockFriends[profileIdx].id;
+      const fId = -1;
       setFriendStates((prev) => ({ ...prev, [fId]: !prev[fId] }));
     };
 
