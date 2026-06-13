@@ -322,7 +322,7 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
                 color: isFriend(u.id) ? "#2ECC71" : isPending(u.id) ? "var(--vn-muted)" : "var(--vn-blue-bright)",
                 cursor: "pointer", fontSize: "0.74rem", fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s", flexShrink: 0,
               }}>
-              {friendBtnLabel(u.id)}
+              {isFriend(u.id) ? "✓ Друг" : isPending(u.id) ? "Запрос отправлен" : "+ Добавить"}
             </button>
           </div>
         ))}

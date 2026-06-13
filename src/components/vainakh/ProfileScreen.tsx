@@ -2009,7 +2009,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
             }}
           >
             {[
-              { label: "Друзей", value: String(mockFriends.length), onClick: () => setSection("friends") },
+              { label: "Друзей", value: String(realFriends.length), onClick: () => setSection("friends") },
               { label: "Фото", value: "24", onClick: () => {} },
               { label: "Статусов", value: "7", onClick: () => {} },
             ].map((s) => (
@@ -2068,7 +2068,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
               </button>
             </div>
             <div style={{ display: "flex", gap: 12, overflowX: "auto" }} className="scrollbar-hide">
-              {mockFriends.map((f, i) => (
+              {realFriends.slice(0, 5).map((f, i) => (
                 <button
                   key={f.id}
                   onClick={() => openOtherProfile(f)}
