@@ -6,6 +6,7 @@ import ssl
 import psycopg2
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate
 from datetime import datetime, timedelta
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p48581099_vaynah_messenger_spe")
@@ -18,7 +19,7 @@ CORS = {
 
 
 def handler(event: dict, context) -> dict:
-    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP."""
+    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP. v2"""
 
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
@@ -68,9 +69,11 @@ def handler(event: dict, context) -> dict:
     """
 
     msg = MIMEMultipart("alternative")
+    msg["Date"] = formatdate(localtime=True)
     msg["Subject"] = "Ваш код для входа в ВайНах"
-    msg["From"] = f"ВайНах <{smtp_user}>"
+    msg["From"] = smtp_user
     msg["To"] = email
+    msg["Message-ID"] = f"<{code}.{int(datetime.utcnow().timestamp())}@mail.ru>"
     msg.attach(MIMEText(f"Ваш код для входа в ВайНах: {code}\nКод действителен 10 минут.", "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
