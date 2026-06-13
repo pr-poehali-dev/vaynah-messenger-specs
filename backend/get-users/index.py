@@ -25,7 +25,7 @@ def handler(event: dict, context) -> dict:
     try:
         cur.execute(
             f"""
-            SELECT id, email, name, surname, city, about
+            SELECT id, email, name, surname, city, about, avatar_url
             FROM {SCHEMA}.users
             WHERE name IS NOT NULL AND name != ''
             AND email != %s
@@ -40,7 +40,7 @@ def handler(event: dict, context) -> dict:
 
     users = []
     for row in rows:
-        uid, email, name, surname, city, about = row
+        uid, email, name, surname, city, about, avatar_url = row
         users.append({
             "id": uid,
             "email": email,
@@ -50,6 +50,7 @@ def handler(event: dict, context) -> dict:
             "about": about or "",
             "online": False,
             "avatar": (name or " ")[0].upper(),
+            "avatar_url": avatar_url or "",
         })
 
     return {

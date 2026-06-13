@@ -136,7 +136,7 @@ export default function Index() {
             <AuthScreen
               onLogin={(email, userData) => {
                 setLoginEmail(email);
-                const u = { ...defaultUser, ...userData, email };
+                const u = { ...defaultUser, ...userData, email, avatar: (userData as { avatar_url?: string })?.avatar_url || "" };
                 setUser(u);
                 const isRegistered = !!(userData?.name && userData.name.trim() && userData?.surname && userData.surname.trim());
                 if (isRegistered) {

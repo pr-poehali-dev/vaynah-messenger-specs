@@ -1,13 +1,18 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
+import func2url from "../../../backend/func2url.json";
 
 interface Status {
   id: number;
   user: string;
+  user_name: string;
+  user_surname: string;
   avatar: string;
+  avatar_url?: string;
   type: "photo" | "text" | "video" | "audio";
   content: string;
+  file_url?: string;
   time: string;
   viewed: boolean;
   emoji?: string;
@@ -15,6 +20,7 @@ interface Status {
   fileName?: string;
   reactions: Record<string, number>;
   myReaction?: string;
+  is_mine?: boolean;
 }
 
 const STATUS_COLORS = [
@@ -27,8 +33,6 @@ const STATUS_COLORS = [
   "linear-gradient(160deg,#3E2723,#5D4037)",
   "linear-gradient(160deg,#263238,#455A64)",
 ];
-
-const mockStatuses: Status[] = [];
 
 const avatarColors = [
   "linear-gradient(135deg, #1565C0, #2196F3)",
@@ -44,7 +48,9 @@ interface Props {
 }
 
 export default function StatusesScreen({ user }: Props) {
-  const [statuses, setStatuses] = useState<Status[]>(mockStatuses);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
   const [activeStatus, setActiveStatus] = useState<Status | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newType, setNewType] = useState<"text" | "photo" | "video" | "audio" | "link">("text");
@@ -52,10 +58,44 @@ export default function StatusesScreen({ user }: Props) {
   const [emojiOverlay, setEmojiOverlay] = useState("");
   const [newColor, setNewColor] = useState(STATUS_COLORS[0]);
   const [newFileName, setNewFileName] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+
+  const loadStatuses = useCallback(() => {
+    fetch(`${func2url["social"]}?action=statuses&email=${encodeURIComponent(user.email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          setStatuses(data.statuses.map((s: { id: number; type: string; content: string; file_url: string; color: string; emoji: string; time: string; user_name: string; user_surname: string; avatar: string; avatar_url: string; is_mine: boolean }) => ({
+            id: s.id,
+            user: `${s.user_name} ${s.user_surname}`.trim(),
+            user_name: s.user_name,
+            user_surname: s.user_surname,
+            avatar: s.avatar,
+            avatar_url: s.avatar_url || "",
+            type: s.type as Status["type"],
+            content: s.content,
+            file_url: s.file_url || "",
+            time: s.time,
+            color: s.color || "",
+            emoji: s.emoji || "",
+            viewed: false,
+            reactions: {},
+            is_mine: s.is_mine,
+          })));
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [user.email]);
+
+  useEffect(() => {
+    loadStatuses();
+    const interval = setInterval(loadStatuses, 10000);
+    return () => clearInterval(interval);
+  }, [loadStatuses]);
 
   const pickFile = (type: "photo" | "video" | "audio") => {
     if (type === "photo") photoInputRef.current?.click();
@@ -66,6 +106,7 @@ export default function StatusesScreen({ user }: Props) {
   const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingFile(file);
     setNewFileName(file.name);
     if (!newContent) setNewContent(file.name);
     e.target.value = "";
@@ -144,8 +185,10 @@ export default function StatusesScreen({ user }: Props) {
           )}
           {activeStatus.type === "photo" && (
             <div style={{ textAlign: "center" }}>
-              <div style={{ width: 200, height: 200, borderRadius: "1.2rem", background: "linear-gradient(135deg, rgba(21,101,192,0.4), rgba(33,150,243,0.3))", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(33,150,243,0.3)", margin: "0 auto" }}>
-                <Icon name="Image" size={60} color="rgba(255,255,255,0.3)" />
+              <div style={{ width: 260, height: 260, borderRadius: "1.2rem", background: "linear-gradient(135deg, rgba(21,101,192,0.4), rgba(33,150,243,0.3))", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(33,150,243,0.3)", margin: "0 auto", overflow: "hidden" }}>
+                {activeStatus.file_url
+                  ? <img src={activeStatus.file_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <Icon name="Image" size={60} color="rgba(255,255,255,0.3)" />}
               </div>
               <p style={{ color: "rgba(255,255,255,0.6)", marginTop: "1rem", fontSize: "0.9rem" }}>{activeStatus.content}</p>
             </div>
@@ -286,28 +329,54 @@ export default function StatusesScreen({ user }: Props) {
     const isMedia = newType === "photo" || newType === "video" || newType === "audio";
     const canPublish = isMedia ? !!newFileName : !!newContent.trim();
 
-    const publish = () => {
-      if (!canPublish) return;
-      setStatuses((prev) => [
-        {
-          id: Date.now(),
-          user: user.name || "Я",
-          avatar: (user.name || "Я")[0],
-          type: newType === "link" ? "text" : newType,
-          content: newContent || newFileName || "Новый статус",
-          time: "только что",
-          viewed: false,
-          emoji: emojiOverlay || undefined,
-          color: newType === "text" || newType === "link" ? newColor : undefined,
-          fileName: newFileName || undefined,
-          reactions: {},
-        },
-        ...prev,
-      ]);
+    const publish = async () => {
+      if (!canPublish || posting) return;
+      setPosting(true);
+      try {
+        if (pendingFile) {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const base64 = reader.result as string;
+            await fetch(`${func2url["social"]}?action=upload`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                upload_type: "status",
+                email: user.email,
+                file: base64,
+                mime: pendingFile.type,
+                status_type: newType === "link" ? "text" : newType,
+                content: newContent || newFileName || "Новый статус",
+                color: newType === "text" || newType === "link" ? newColor : null,
+                emoji: emojiOverlay || null,
+              }),
+            });
+            loadStatuses();
+            setPosting(false);
+          };
+          reader.readAsDataURL(pendingFile);
+        } else {
+          await fetch(`${func2url["social"]}?action=status-text`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: user.email,
+              content: newContent,
+              color: newColor,
+              emoji: emojiOverlay || null,
+            }),
+          });
+          loadStatuses();
+          setPosting(false);
+        }
+      } catch {
+        setPosting(false);
+      }
       setShowCreate(false);
       setNewContent("");
       setEmojiOverlay("");
       setNewFileName("");
+      setPendingFile(null);
       setNewColor(STATUS_COLORS[0]);
       setNewType("text");
     };
@@ -322,10 +391,10 @@ export default function StatusesScreen({ user }: Props) {
           <button
             className="vn-btn"
             onClick={publish}
-            disabled={!canPublish}
-            style={{ width: "auto", padding: "0.45rem 1rem", fontSize: "0.85rem", opacity: canPublish ? 1 : 0.5, cursor: canPublish ? "pointer" : "not-allowed" }}
+            disabled={!canPublish || posting}
+            style={{ width: "auto", padding: "0.45rem 1rem", fontSize: "0.85rem", opacity: (canPublish && !posting) ? 1 : 0.5, cursor: (canPublish && !posting) ? "pointer" : "not-allowed" }}
           >
-            Опубликовать
+            {posting ? "Загрузка..." : "Опубликовать"}
           </button>
         </div>
 
@@ -493,7 +562,19 @@ export default function StatusesScreen({ user }: Props) {
         </div>
 
         <div style={{ padding: "0.5rem 0" }}>
-          {statuses.map((s, i) => {
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+              <Icon name="Loader" size={28} color="var(--vn-muted)" />
+              <p style={{ marginTop: "0.8rem", fontSize: "0.9rem" }}>Загружаем статусы...</p>
+            </div>
+          ) : statuses.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📸</div>
+              <p style={{ fontWeight: 600 }}>Нет статусов</p>
+              <p style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>Будь первым — добавь статус!</p>
+            </div>
+          ) : null}
+          {!loading && statuses.map((s, i) => {
             const reactionCount = Object.values(s.reactions).reduce((a, b) => a + b, 0);
             const topReactions = Object.entries(s.reactions).filter(([, c]) => c > 0).slice(0, 3);
             return (

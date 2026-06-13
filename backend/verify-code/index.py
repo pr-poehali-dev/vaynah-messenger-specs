@@ -70,14 +70,14 @@ def handler(event: dict, context) -> dict:
 
         # Создаём или находим пользователя
         cur.execute(
-            f"SELECT id, name, surname, city, birthdate, about, phone FROM {SCHEMA}.users WHERE email = %s",
+            f"SELECT id, name, surname, city, birthdate, about, phone, avatar_url FROM {SCHEMA}.users WHERE email = %s",
             (email,)
         )
         user_row = cur.fetchone()
 
         is_new = False
         if user_row:
-            user_id, name, surname, city, birthdate, about, phone = user_row
+            user_id, name, surname, city, birthdate, about, phone, avatar_url = user_row
         else:
             cur.execute(
                 f"INSERT INTO {SCHEMA}.users (email) VALUES (%s) RETURNING id",
@@ -86,6 +86,7 @@ def handler(event: dict, context) -> dict:
             user_id = cur.fetchone()[0]
             name = surname = city = about = phone = ""
             birthdate = None
+            avatar_url = ""
             is_new = True
 
         conn.commit()
@@ -105,6 +106,7 @@ def handler(event: dict, context) -> dict:
                     "birthdate": str(birthdate) if birthdate else "",
                     "about": about or "",
                     "phone": phone or "",
+                    "avatar_url": avatar_url or "",
                 }
             })
         }

@@ -1753,6 +1753,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
         <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
           <SettingRow icon="Bell" label="Уведомления" onClick={() => setSection("notifications")} />
           <SettingRow icon="Eye" label="Приватность" onClick={() => setSection("privacy")} />
+          <SettingRow icon="Ban" label="Заблокированные" onClick={() => setSection("blocked")} />
           <SettingRow icon="ShieldCheck" label="Безопасность" onClick={() => setSection("security")} />
           <SettingRow icon="MessageSquare" label="Сообщения" onClick={() => setSection("messages")} />
           <SettingRow icon="HardDrive" label="Медиа и память" onClick={() => setSection("storage")} />
@@ -1939,7 +1940,23 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
         type="file"
         accept="image/*"
         style={{ display: "none" }}
-        onChange={() => {}}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const base64 = reader.result as string;
+            const res = await fetch(`${func2url["social"]}?action=upload`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ upload_type: "avatar", email: user.email, file: base64, mime: file.type }),
+            });
+            const data = await res.json();
+            if (data.ok) setUser({ ...user, avatar: data.url });
+          };
+          reader.readAsDataURL(file);
+          e.target.value = "";
+        }}
       />
 
       <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
@@ -1974,8 +1991,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                   width: 88,
                   height: 88,
                   borderRadius: "50%",
-                  background:
-                    "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))",
+                  background: user.avatar?.startsWith("http") ? "none" : "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1983,9 +1999,12 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                   fontSize: "2.2rem",
                   color: "white",
                   boxShadow: "0 8px 28px rgba(33,150,243,0.35)",
+                  overflow: "hidden",
                 }}
               >
-                {initials}
+                {user.avatar?.startsWith("http")
+                  ? <img src={user.avatar} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : initials}
               </div>
               <div
                 style={{
