@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component, ReactNode } from "react";
 import Icon from "@/components/ui/icon";
 import ChatsScreen from "./ChatsScreen";
 import SearchScreen from "./SearchScreen";
@@ -7,6 +7,20 @@ import ProfileScreen from "./ProfileScreen";
 import NotificationsScreen from "./NotificationsScreen";
 import { User, Theme } from "@/pages/Index";
 import func2url from "../../../backend/func2url.json";
+
+class TabBoundary extends Component<{ name: string; children: ReactNode }, { err: string | null }> {
+  constructor(p: { name: string; children: ReactNode }) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(e: Error) { return { err: e.message }; }
+  componentDidCatch(e: Error) { console.error("TAB CRASH [" + this.props.name + "]:", e.message, e.stack); }
+  render() {
+    if (this.state.err) return (
+      <div style={{ padding: "2rem", color: "#E74C3C", fontSize: "0.85rem" }}>
+        <b>Ошибка в {this.props.name}:</b><br />{this.state.err}
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 type Tab = "search" | "chats" | "statuses" | "profile" | "notifications";
 
@@ -45,11 +59,11 @@ export default function MainApp({ user, setUser, onLogout, theme, toggleTheme }:
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        {activeTab === "search" && <SearchScreen theme={theme} toggleTheme={toggleTheme} currentUser={user} />}
-        {activeTab === "chats" && <ChatsScreen user={user} />}
-        {activeTab === "statuses" && <StatusesScreen user={user} />}
-        {activeTab === "notifications" && <NotificationsScreen user={user} />}
-        {activeTab === "profile" && <ProfileScreen user={user} setUser={setUser} onLogout={onLogout} />}
+        {activeTab === "search" && <TabBoundary name="Поиск"><SearchScreen theme={theme} toggleTheme={toggleTheme} currentUser={user} /></TabBoundary>}
+        {activeTab === "chats" && <TabBoundary name="Чаты"><ChatsScreen user={user} /></TabBoundary>}
+        {activeTab === "statuses" && <TabBoundary name="Статусы"><StatusesScreen user={user} /></TabBoundary>}
+        {activeTab === "notifications" && <TabBoundary name="Уведомления"><NotificationsScreen user={user} /></TabBoundary>}
+        {activeTab === "profile" && <TabBoundary name="Профиль"><ProfileScreen user={user} setUser={setUser} onLogout={onLogout} /></TabBoundary>}
       </div>
 
       {/* Bottom Navigation */}
