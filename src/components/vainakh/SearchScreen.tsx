@@ -130,9 +130,16 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
     }
   };
 
-  const blockUser = (userId: number) => {
-    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isBlocked: true } : u));
+  const blockUser = async (u: SearchUser) => {
+    if (!currentUser?.email) return;
+    await fetch(`${func2url["social"]}?action=block`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ my_email: currentUser.email, target_email: u.email, block_action: "block" }),
+    });
+    setUsers((prev) => prev.filter((usr) => usr.id !== u.id));
     setSelectedUser(null);
+    showToast(`${u.name} заблокирован`);
   };
 
   if (openCall) {
@@ -193,7 +200,7 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
             </button>
           </div>
           <div style={{ padding: "0 1.2rem 1.2rem" }}>
-            <button onClick={() => blockUser(selectedUser.id)}
+            <button onClick={() => blockUser(selectedUser)}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.25)", borderRadius: "0.75rem", padding: "0.75rem", color: "#E74C3C", cursor: "pointer", fontSize: "0.88rem" }}>
               <Icon name="Ban" size={15} color="#E74C3C" />Заблокировать
             </button>

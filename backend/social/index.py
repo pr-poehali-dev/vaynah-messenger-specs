@@ -162,6 +162,43 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True})}
 
+        # POST /social?action=block
+        elif method == "POST" and action == "block":
+            body = json.loads(event.get("body") or "{}")
+            my_email = (body.get("my_email") or "").strip().lower()
+            target_email = (body.get("target_email") or "").strip().lower()
+            block_action = (body.get("block_action") or "block").strip()  # block|unblock
+
+            my_id = get_user_id(cur, my_email)
+            target_id = get_user_id(cur, target_email)
+            if not my_id or not target_id:
+                return {"statusCode": 404, "headers": CORS, "body": json.dumps({"error": "Пользователь не найден"})}
+
+            if block_action == "block":
+                cur.execute(f"INSERT INTO {SCHEMA}.blocks (blocker_id, blocked_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (my_id, target_id))
+            elif block_action == "unblock":
+                cur.execute(f"DELETE FROM {SCHEMA}.blocks WHERE blocker_id = %s AND blocked_id = %s", (my_id, target_id))
+            conn.commit()
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True})}
+
+        # GET /social?action=blocked&email=...
+        elif method == "GET" and action == "blocked":
+            email = (params.get("email") or "").strip().lower()
+            my_id = get_user_id(cur, email)
+            if not my_id:
+                return {"statusCode": 404, "headers": CORS, "body": json.dumps({"error": "Не найден"})}
+
+            cur.execute(f"""
+                SELECT u.id, u.name, u.surname, u.city, u.email
+                FROM {SCHEMA}.blocks b
+                JOIN {SCHEMA}.users u ON b.blocked_id = u.id
+                WHERE b.blocker_id = %s
+                ORDER BY b.created_at DESC
+            """, (my_id,))
+            blocked = [{"id": r[0], "name": r[1] or "", "surname": r[2] or "", "city": r[3] or "",
+                        "email": r[4], "avatar": (r[1] or "?")[0].upper()} for r in cur.fetchall()]
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True, "blocked": blocked})}
+
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Неизвестный action"})}
 
     finally:

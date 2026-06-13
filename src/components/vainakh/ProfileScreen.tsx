@@ -25,6 +25,7 @@ type ProfileSection =
   | "devices"
   | "favorites"
   | "friends"
+  | "blocked"
   | "other-profile";
 
 interface OtherProfile {
@@ -161,6 +162,8 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [hideLastSeen, setHideLastSeen] = useState(false);
   const [realFriends, setRealFriends] = useState<RealFriend[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<RealFriend[]>([]);
+  const [blockedLoading, setBlockedLoading] = useState(false);
   const [notifsOn, setNotifsOn] = useState(true);
   const [notifVibration, setNotifVibration] = useState(true);
   const [showRead, setShowRead] = useState(true);
@@ -184,6 +187,12 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
         .then((r) => r.json())
         .then((data) => { if (data.ok) setRealFriends(data.friends); })
         .finally(() => setFriendsLoading(false));
+    }
+    if ((section === "blocked" || section === "privacy") && user.email) {
+      fetch(`${func2url["social"]}?action=blocked&email=${encodeURIComponent(user.email)}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.ok) setBlockedUsers(data.blocked); });
+      if (section === "blocked") setBlockedLoading(true);
     }
   }, [section, user.email]);
 
@@ -384,6 +393,58 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                 <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{f.name} {f.surname}</div>
                 <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>{f.city}</div>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── BLOCKED ──
+  if (section === "blocked") {
+    const unblock = async (target: RealFriend) => {
+      await fetch(`${func2url["social"]}?action=block`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ my_email: user.email, target_email: target.email, block_action: "unblock" }),
+      });
+      setBlockedUsers((prev) => prev.filter((u) => u.id !== target.id));
+    };
+    return (
+      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
+          <button onClick={() => setSection("privacy")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
+            <Icon name="ArrowLeft" size={22} />
+          </button>
+          <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem", flex: 1 }}>Заблокированные</h2>
+          <span style={{ fontSize: "0.8rem", color: "var(--vn-muted)" }}>{blockedUsers.length}</span>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
+          {blockedLoading ? (
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+              <Icon name="Loader" size={28} color="var(--vn-muted)" />
+              <p style={{ marginTop: "0.8rem", fontSize: "0.9rem" }}>Загружаем...</p>
+            </div>
+          ) : blockedUsers.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "4rem 1.5rem", color: "var(--vn-muted)" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🚫</div>
+              <p style={{ fontWeight: 600 }}>Нет заблокированных</p>
+              <p style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>Все заблокированные пользователи появятся здесь</p>
+            </div>
+          ) : blockedUsers.map((u, i) => (
+            <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.9rem 1.2rem", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+              <div style={{ width: 50, height: 50, borderRadius: "50%", background: avatarGrads[i % avatarGrads.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem", flexShrink: 0 }}>
+                {u.avatar}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{u.name} {u.surname}</div>
+                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>{u.city}</div>
+              </div>
+              <button
+                onClick={() => unblock(u)}
+                style={{ padding: "0.4rem 0.9rem", background: "rgba(46,204,113,0.1)", border: "1px solid rgba(46,204,113,0.3)", borderRadius: "50px", color: "#2ECC71", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap" }}
+              >
+                Разблокировать
+              </button>
             </div>
           ))}
         </div>
@@ -1631,6 +1692,16 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
           {/* Who can message */}
           <div style={{ padding: "1rem 1.2rem" }}>
             <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.9rem" }}>Кто может писать мне</p>
+            <button onClick={() => setSection("blocked")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "0.75rem 0", background: "none", border: "none", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.04)", marginBottom: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Icon name="Ban" size={18} color="#E74C3C" />
+                <span style={{ fontSize: "0.9rem", color: "var(--vn-text)" }}>Заблокированные пользователи</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {blockedUsers.length > 0 && <span style={{ fontSize: "0.8rem", color: "var(--vn-muted)" }}>{blockedUsers.length}</span>}
+                <Icon name="ChevronRight" size={16} color="var(--vn-muted)" />
+              </div>
+            </button>
             {[{ id: "all", label: "Все пользователи", desc: "Любой может начать диалог" }, { id: "friends", label: "Только друзья", desc: "Сообщения только от людей из вашего списка" }, { id: "none", label: "Никто", desc: "Новые диалоги отключены" }].map((opt) => (
               <button
                 key={opt.id}
@@ -2010,8 +2081,8 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
           >
             {[
               { label: "Друзей", value: String(realFriends.length), onClick: () => setSection("friends") },
-              { label: "Фото", value: "24", onClick: () => {} },
-              { label: "Статусов", value: "7", onClick: () => {} },
+              { label: "Фото", value: "0", onClick: () => {} },
+              { label: "Статусов", value: "0", onClick: () => {} },
             ].map((s) => (
               <button
                 key={s.label}
