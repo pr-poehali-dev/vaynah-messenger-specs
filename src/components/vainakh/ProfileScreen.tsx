@@ -32,6 +32,7 @@ interface OtherProfile {
   name: string;
   surname: string;
   avatar: string;
+  avatar_url?: string;
   city: string;
   birthdate: string;
   online: boolean;
@@ -130,6 +131,7 @@ interface RealFriend {
   name: string;
   surname: string;
   avatar: string;
+  avatar_url?: string;
   city: string;
   email: string;
   online: boolean;
@@ -175,6 +177,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [showRegionSheet, setShowRegionSheet] = useState(false);
   const [regionSearch, setRegionSearch] = useState("");
   const [otherProfile, setOtherProfile] = useState<OtherProfile | null>(null);
+  const [profileIdx, setProfileIdx] = useState(0);
   const [friendStates, setFriendStates] = useState<Record<number, boolean>>({});
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
@@ -201,11 +204,13 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
     setSection("main");
   };
 
-  const openOtherProfile = (f: RealFriend) => {
+  const openOtherProfile = (f: RealFriend, idx: number = 0) => {
+    setProfileIdx(idx);
     setOtherProfile({
       name: f.name,
       surname: f.surname,
       avatar: f.avatar,
+      avatar_url: f.avatar_url,
       city: f.city,
       birthdate: "",
       online: f.online,
@@ -381,6 +386,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
           ) : realFriends.map((f, i) => (
             <div
               key={f.id}
+              onClick={() => openOtherProfile(f, i)}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.9rem 1.2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", animation: `vn-appear 0.3s ease ${i * 0.06}s both`, cursor: "pointer" }}
             >
               <div style={{ position: "relative", flexShrink: 0 }}>
@@ -506,9 +512,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                   width: 90,
                   height: 90,
                   borderRadius: "50%",
-                  background: avatarGrads[
-                    profileIdx >= 0 ? profileIdx % avatarGrads.length : 0
-                  ],
+                  background: otherProfile.avatar_url?.startsWith("http") ? "none" : avatarGrads[profileIdx % avatarGrads.length],
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -516,9 +520,12 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                   fontSize: "2.2rem",
                   color: "white",
                   boxShadow: "0 8px 28px rgba(33,150,243,0.35)",
+                  overflow: "hidden",
                 }}
               >
-                {otherProfile.avatar}
+                {otherProfile.avatar_url?.startsWith("http")
+                  ? <img src={otherProfile.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : otherProfile.avatar}
               </div>
               {otherProfile.online && (
                 <div

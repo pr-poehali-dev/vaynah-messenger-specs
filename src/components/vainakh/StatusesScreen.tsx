@@ -64,8 +64,8 @@ export default function StatusesScreen({ user }: Props) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
-  const loadStatuses = useCallback(() => {
-    fetch(`${func2url["social"]}?action=statuses&email=${encodeURIComponent(user.email)}`)
+  const loadStatuses = useCallback((): Promise<void> => {
+    return fetch(`${func2url["social"]}?action=statuses&email=${encodeURIComponent(user.email)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.ok) {
@@ -327,34 +327,45 @@ export default function StatusesScreen({ user }: Props) {
     ] as const;
 
     const isMedia = newType === "photo" || newType === "video" || newType === "audio";
-    const canPublish = isMedia ? !!newFileName : !!newContent.trim();
+    const isFileMedia = newType === "photo" || newType === "video" || newType === "audio";
+    const canPublish = isFileMedia ? !!newFileName : !!newContent.trim();
 
     const publish = async () => {
       if (!canPublish || posting) return;
       setPosting(true);
+
+      const reset = () => {
+        setShowCreate(false);
+        setNewContent("");
+        setEmojiOverlay("");
+        setNewFileName("");
+        setPendingFile(null);
+        setNewColor(STATUS_COLORS[0]);
+        setNewType("text");
+      };
+
       try {
         if (pendingFile) {
-          const reader = new FileReader();
-          reader.onload = async () => {
-            const base64 = reader.result as string;
-            await fetch(`${func2url["social"]}?action=upload`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                upload_type: "status",
-                email: user.email,
-                file: base64,
-                mime: pendingFile.type,
-                status_type: newType === "link" ? "text" : newType,
-                content: newContent || newFileName || "Новый статус",
-                color: newType === "text" || newType === "link" ? newColor : null,
-                emoji: emojiOverlay || null,
-              }),
-            });
-            loadStatuses();
-            setPosting(false);
-          };
-          reader.readAsDataURL(pendingFile);
+          const toBase64 = (f: File): Promise<string> => new Promise((res) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result as string);
+            r.readAsDataURL(f);
+          });
+          const base64 = await toBase64(pendingFile);
+          await fetch(`${func2url["social"]}?action=upload`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              upload_type: "status",
+              email: user.email,
+              file: base64,
+              mime: pendingFile.type,
+              status_type: newType === "link" ? "text" : newType,
+              content: newContent || newFileName || "Новый статус",
+              color: newType === "text" || newType === "link" ? newColor : null,
+              emoji: emojiOverlay || null,
+            }),
+          });
         } else {
           await fetch(`${func2url["social"]}?action=status-text`, {
             method: "POST",
@@ -362,23 +373,18 @@ export default function StatusesScreen({ user }: Props) {
             body: JSON.stringify({
               email: user.email,
               content: newContent,
-              color: newColor,
+              color: newColor || null,
               emoji: emojiOverlay || null,
             }),
           });
-          loadStatuses();
-          setPosting(false);
         }
+        await loadStatuses();
+        reset();
       } catch {
+        // ignore
+      } finally {
         setPosting(false);
       }
-      setShowCreate(false);
-      setNewContent("");
-      setEmojiOverlay("");
-      setNewFileName("");
-      setPendingFile(null);
-      setNewColor(STATUS_COLORS[0]);
-      setNewType("text");
     };
 
     return (
@@ -440,11 +446,18 @@ export default function StatusesScreen({ user }: Props) {
             {/* Media preview / picker */}
             {isMedia && (
               <div>
-                {newFileName ? (
-                  <div style={{ position: "relative", borderRadius: "1rem", overflow: "hidden", background: newColor, height: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, border: "1px solid var(--vn-border)" }}>
-                    <Icon name={newType === "photo" ? "Image" : newType === "video" ? "Video" : "Music"} size={48} color="rgba(255,255,255,0.5)" />
-                    <span style={{ color: "white", fontSize: "0.85rem", padding: "0 1rem", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", whiteSpace: "nowrap" }}>{newFileName}</span>
-                    <button onClick={() => pickFile(newType as "photo" | "video" | "audio")} style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "50px", padding: "0.3rem 0.9rem", color: "white", cursor: "pointer", fontSize: "0.78rem" }}>
+                {pendingFile ? (
+                  <div style={{ position: "relative", borderRadius: "1rem", overflow: "hidden", background: "var(--vn-card2)", height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, border: "1px solid var(--vn-border)" }}>
+                    {newType === "photo" && (
+                      <img src={URL.createObjectURL(pendingFile)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
+                    {newType === "video" && (
+                      <video src={URL.createObjectURL(pendingFile)} controls style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
+                    {newType === "audio" && (
+                      <audio src={URL.createObjectURL(pendingFile)} controls style={{ width: "90%" }} />
+                    )}
+                    <button onClick={() => pickFile(newType as "photo" | "video" | "audio")} style={{ position: "absolute", bottom: 10, right: 10, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "50px", padding: "0.3rem 0.9rem", color: "white", cursor: "pointer", fontSize: "0.78rem", zIndex: 1 }}>
                       Заменить
                     </button>
                   </div>

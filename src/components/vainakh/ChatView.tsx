@@ -17,6 +17,7 @@ interface Message {
   time: string;
   type: MsgType;
   fileName?: string;
+  fileUrl?: string;
   duration?: string;
   reactions: Reaction[];
   replyTo?: { id: number; text: string; author: string };
@@ -96,11 +97,16 @@ export default function ChatView({ chat, user, onBack }: Props) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [selectedMsg, setSelectedMsg] = useState<number | null>(null);
   const [msgMenu, setMsgMenu] = useState<Message | null>(null);
-  const [fullscreenMedia, setFullscreenMedia] = useState<{ type: "image" | "video"; name: string } | null>(null);
+  const [fullscreenMedia, setFullscreenMedia] = useState<{ type: "image" | "video"; url: string; name: string } | null>(null);
   const [webview, setWebview] = useState<string | null>(null);
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [wallpaper, setWallpaper] = useState("default");
   const [chatCleared, setChatCleared] = useState(false);
+  const [otherOnline, setOtherOnline] = useState(chat.online ?? false);
+  const [otherLastSeen, setOtherLastSeen] = useState("...");
+  const [otherTyping, setOtherTyping] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // mic: tap toggles circleMode (voice <-> video circle), hold records
   const [circleMode, setCircleMode] = useState(false);
@@ -134,15 +140,21 @@ export default function ChatView({ chat, user, onBack }: Props) {
       .then((r) => r.json())
       .then((data) => {
         if (data.ok) {
-          const msgs: Message[] = data.messages.map((m: { id: number; from_me: boolean; text: string; time: string }) => ({
+          const msgs: Message[] = data.messages.map((m: { id: number; from_me: boolean; text: string; time: string; type: string; file_url: string; file_name: string; duration: string }) => ({
             id: m.id,
-            text: m.text,
+            text: m.text || "",
             mine: m.from_me,
             time: m.time,
-            type: "text" as const,
+            type: (m.type || "text") as MsgType,
+            fileUrl: m.file_url || "",
+            fileName: m.file_name || "",
+            duration: m.duration || "",
             reactions: [],
           }));
           setMessages(msgs);
+          if (data.other_online !== undefined) setOtherOnline(data.other_online);
+          if (data.other_last_seen) setOtherLastSeen(data.other_last_seen);
+          if (data.other_typing !== undefined) setOtherTyping(data.other_typing);
         }
       });
   }, [chat.email, user.email]);
@@ -158,6 +170,15 @@ export default function ChatView({ chat, user, onBack }: Props) {
   }, [messages]);
 
   useEffect(() => { recordSecondsRef.current = recordSeconds; }, [recordSeconds]);
+
+  const sendTyping = useCallback(() => {
+    if (!chat.email || !user.email) return;
+    fetch(`${func2url["social"]}?action=typing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from_email: user.email, to_email: chat.email }),
+    });
+  }, [chat.email, user.email]);
 
   const pushMsg = useCallback((msg: Omit<Message, "id" | "time" | "reactions">) => {
     if (msg.type === "text" && msg.text && chat.email && user.email) {
@@ -229,10 +250,37 @@ export default function ChatView({ chat, user, onBack }: Props) {
   // ── File pickers ──
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>, type: MsgType) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    pushMsg({ text: "", mine: true, type, fileName: file.name });
+    if (!file || !chat.email || !user.email) return;
     e.target.value = "";
     setAttachOpen(false);
+    setUploading(true);
+
+    // Сразу показываем сообщение с именем файла (оптимистично)
+    const tempId = Date.now();
+    setMessages((prev) => [...prev, { id: tempId, text: "", mine: true, time: getNow(), type, fileName: file.name, fileUrl: "", reactions: [] }]);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      const res = await fetch(`${func2url["social"]}?action=send-file`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from_email: user.email, to_email: chat.email,
+          msg_type: type, file: base64, mime: file.type, file_name: file.name,
+        }),
+      });
+      const data = await res.json();
+      setUploading(false);
+      if (data.ok) {
+        // Заменяем временное сообщение реальным с URL
+        setMessages((prev) => prev.map((m) => m.id === tempId
+          ? { ...m, id: data.id, fileUrl: data.file_url, fileName: data.file_name, time: data.time }
+          : m
+        ));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // ── Reactions ──
@@ -332,11 +380,13 @@ export default function ChatView({ chat, user, onBack }: Props) {
         </button>
         <button onClick={() => setShowProfile(true)} style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
           <div style={{ width: 42, height: 42, borderRadius: "50%", background: AV[0], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem" }}>{chat.avatar}</div>
-          {chat.online && <div className="vn-online" style={{ position: "absolute", bottom: 0, right: 0 }} />}
+          {otherOnline && <div className="vn-online" style={{ position: "absolute", bottom: 0, right: 0 }} />}
         </button>
         <button onClick={() => setShowProfile(true)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
           <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--vn-text)" }}>{chat.name}</div>
-          <div style={{ fontSize: "0.72rem", color: chat.online ? "#2ECC71" : "var(--vn-muted)" }}>{chat.online ? "онлайн" : "был(а) недавно"}</div>
+          <div style={{ fontSize: "0.72rem", color: otherTyping ? "var(--vn-blue-bright)" : otherOnline ? "#2ECC71" : "var(--vn-muted)", fontStyle: otherTyping ? "italic" : "normal" }}>
+            {otherTyping ? "печатает..." : otherOnline ? "онлайн" : otherLastSeen}
+          </div>
         </button>
         <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
           <button onClick={() => setCall("audio")} style={{ background: "rgba(33,150,243,0.12)", border: "none", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -441,10 +491,14 @@ export default function ChatView({ chat, user, onBack }: Props) {
                   )}
                   {msg.type === "image" && (
                     <div
-                      onClick={(e) => { e.stopPropagation(); setFullscreenMedia({ type: "image", name: msg.fileName || "photo.jpg" }); }}
-                      style={{ width: 180, height: 130, borderRadius: "0.75rem", background: "linear-gradient(135deg,rgba(21,101,192,0.5),rgba(33,150,243,0.4))", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in", position: "relative", overflow: "hidden" }}
+                      onClick={(e) => { e.stopPropagation(); setFullscreenMedia({ type: "image", url: msg.fileUrl || "", name: msg.fileName || "photo.jpg" }); }}
+                      style={{ width: 180, height: 150, borderRadius: "0.75rem", background: "linear-gradient(135deg,rgba(21,101,192,0.5),rgba(33,150,243,0.4))", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in", position: "relative", overflow: "hidden" }}
                     >
-                      <Icon name="Image" size={36} color="rgba(255,255,255,0.5)" />
+                      {msg.fileUrl ? (
+                        <img src={msg.fileUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <Icon name="Image" size={36} color="rgba(255,255,255,0.5)" />
+                      )}
                       <div style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,0.5)", borderRadius: "50px", padding: "2px 7px", fontSize: "0.7rem", color: "white" }}>
                         {msg.fileName || "фото"}
                       </div>
@@ -452,26 +506,52 @@ export default function ChatView({ chat, user, onBack }: Props) {
                   )}
                   {msg.type === "video" && (
                     <div
-                      onClick={(e) => { e.stopPropagation(); setFullscreenMedia({ type: "video", name: msg.fileName || "video.mp4" }); }}
-                      style={{ width: 180, height: 130, borderRadius: "0.75rem", background: "linear-gradient(135deg,#0D1626,#1565C0)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}
+                      onClick={(e) => { e.stopPropagation(); setFullscreenMedia({ type: "video", url: msg.fileUrl || "", name: msg.fileName || "video.mp4" }); }}
+                      style={{ width: 180, height: 130, borderRadius: "0.75rem", background: "linear-gradient(135deg,#0D1626,#1565C0)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "hidden" }}
                     >
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {msg.fileUrl && <video src={msg.fileUrl} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />}
+                      <div style={{ position: "relative", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Icon name="Play" size={20} color="white" />
                       </div>
                       <div style={{ position: "absolute", bottom: 6, left: 6, background: "rgba(0,0,0,0.5)", borderRadius: "50px", padding: "2px 7px", fontSize: "0.7rem", color: "white" }}>▶ {msg.fileName}</div>
                     </div>
                   )}
+                  {msg.type === "voice" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 130 }}>
+                      {msg.fileUrl ? (
+                        <audio controls src={msg.fileUrl} style={{ height: 28, maxWidth: 180 }} />
+                      ) : (
+                        <>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: msg.mine ? "rgba(255,255,255,0.2)" : "rgba(33,150,243,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Icon name="Play" size={12} color={msg.mine ? "white" : "var(--vn-blue-bright)"} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ height: 3, borderRadius: 2, background: msg.mine ? "rgba(255,255,255,0.3)" : "var(--vn-border)", marginBottom: 3 }}>
+                              <div style={{ width: "55%", height: "100%", borderRadius: 2, background: msg.mine ? "white" : "var(--vn-blue-light)" }} />
+                            </div>
+                            <span style={{ fontSize: "0.7rem", opacity: 0.75 }}>{msg.duration || "0:01"}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {msg.type === "audio" && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 140 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: msg.mine ? "rgba(255,255,255,0.2)" : "rgba(33,150,243,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Icon name="Music" size={13} color={msg.mine ? "white" : "var(--vn-blue-bright)"} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "0.82rem", fontWeight: 500, marginBottom: 3, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.fileName}</div>
-                        <div style={{ height: 3, borderRadius: 2, background: msg.mine ? "rgba(255,255,255,0.3)" : "var(--vn-border)" }}>
-                          <div style={{ width: "40%", height: "100%", borderRadius: 2, background: msg.mine ? "white" : "var(--vn-blue-light)" }} />
-                        </div>
-                      </div>
+                      {msg.fileUrl ? (
+                        <audio controls src={msg.fileUrl} style={{ height: 28, maxWidth: 180 }} />
+                      ) : (
+                        <>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: msg.mine ? "rgba(255,255,255,0.2)" : "rgba(33,150,243,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Icon name="Music" size={13} color={msg.mine ? "white" : "var(--vn-blue-bright)"} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "0.82rem", fontWeight: 500, marginBottom: 3, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.fileName}</div>
+                            <div style={{ height: 3, borderRadius: 2, background: msg.mine ? "rgba(255,255,255,0.3)" : "var(--vn-border)" }}>
+                              <div style={{ width: "40%", height: "100%", borderRadius: 2, background: msg.mine ? "white" : "var(--vn-blue-light)" }} />
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                   {msg.type === "document" && (
@@ -479,7 +559,13 @@ export default function ChatView({ chat, user, onBack }: Props) {
                       <div style={{ width: 32, height: 32, borderRadius: "0.4rem", background: msg.mine ? "rgba(255,255,255,0.2)" : "rgba(33,150,243,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Icon name="FileText" size={15} color={msg.mine ? "white" : "var(--vn-blue-bright)"} />
                       </div>
-                      <span style={{ fontSize: "0.82rem", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.fileName}</span>
+                      {msg.fileUrl ? (
+                        <a href={msg.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: "0.82rem", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: msg.mine ? "rgba(255,255,255,0.9)" : "var(--vn-blue-bright)", textDecoration: "underline" }}>
+                          {msg.fileName}
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: "0.82rem", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.fileName}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -566,6 +652,14 @@ export default function ChatView({ chat, user, onBack }: Props) {
         </div>
       )}
 
+      {/* ── Uploading indicator ── */}
+      {uploading && (
+        <div style={{ padding: "0.4rem 1rem", background: "var(--vn-card)", borderTop: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon name="Loader" size={14} color="var(--vn-blue-bright)" />
+          <span style={{ fontSize: "0.78rem", color: "var(--vn-muted)" }}>Загружаем файл...</span>
+        </div>
+      )}
+
       {/* ── Attach menu ── */}
       {attachOpen && (
         <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--vn-border)", background: "var(--vn-card)", animation: "vn-appear 0.2s ease" }}>
@@ -624,7 +718,11 @@ export default function ChatView({ chat, user, onBack }: Props) {
           className="vn-input"
           placeholder="Сообщение..."
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            sendTyping();
+            if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+          }}
           onKeyDown={(e) => { if (e.key === "Enter") send(); }}
           style={{ flex: 1, padding: "0.55rem 0.8rem", fontSize: "0.9rem" }}
         />
@@ -754,16 +852,24 @@ export default function ChatView({ chat, user, onBack }: Props) {
             <Icon name="X" size={18} color="white" />
           </button>
           {fullscreenMedia.type === "image" ? (
-            <div style={{ width: "90%", aspectRatio: "4/3", background: "linear-gradient(135deg,rgba(21,101,192,0.4),rgba(33,150,243,0.3))", borderRadius: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="Image" size={60} color="rgba(255,255,255,0.4)" />
-            </div>
-          ) : (
-            <div style={{ width: "90%", aspectRatio: "16/9", background: "#0A1628", borderRadius: "0.75rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(33,150,243,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name="Play" size={28} color="white" />
+            fullscreenMedia.url ? (
+              <img src={fullscreenMedia.url} style={{ maxWidth: "95%", maxHeight: "85%", borderRadius: "0.75rem", objectFit: "contain" }} />
+            ) : (
+              <div style={{ width: "90%", aspectRatio: "4/3", background: "linear-gradient(135deg,rgba(21,101,192,0.4),rgba(33,150,243,0.3))", borderRadius: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon name="Image" size={60} color="rgba(255,255,255,0.4)" />
               </div>
-              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.85rem" }}>{fullscreenMedia.name}</p>
-            </div>
+            )
+          ) : (
+            fullscreenMedia.url ? (
+              <video src={fullscreenMedia.url} controls autoPlay style={{ maxWidth: "95%", maxHeight: "85%", borderRadius: "0.75rem" }} />
+            ) : (
+              <div style={{ width: "90%", aspectRatio: "16/9", background: "#0A1628", borderRadius: "0.75rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(33,150,243,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon name="Play" size={28} color="white" />
+                </div>
+                <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.85rem" }}>{fullscreenMedia.name}</p>
+              </div>
+            )
           )}
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.75rem", marginTop: 12 }}>{fullscreenMedia.name}</p>
         </div>
