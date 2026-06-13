@@ -64,6 +64,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   static getDerivedStateFromError() {
     return { hasError: true };
   }
+  componentDidCatch(error: Error) {
+    console.error("APP CRASH:", error.message, error.stack);
+  }
   handleReset() {
     clearSession();
     window.location.reload();

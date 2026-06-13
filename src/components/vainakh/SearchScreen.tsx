@@ -48,6 +48,11 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
   const [users, setUsers] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
+  const [openChat, setOpenChat] = useState<ChatData | null>(null);
+  const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [friendIds, setFriendIds] = useState<number[]>([]);
+  const [pendingIds, setPendingIds] = useState<number[]>([]);
 
   useEffect(() => {
     const email = currentUser?.email || "";
@@ -73,12 +78,6 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
       })
       .finally(() => setLoading(false));
   }, [currentUser?.email]);
-  const [openChat, setOpenChat] = useState<ChatData | null>(null);
-  const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const [friendIds, setFriendIds] = useState<number[]>([]);
-  const [pendingIds, setPendingIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!currentUser?.email) return;

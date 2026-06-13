@@ -161,16 +161,6 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [hideLastSeen, setHideLastSeen] = useState(false);
   const [realFriends, setRealFriends] = useState<RealFriend[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
-
-  useEffect(() => {
-    if (section === "friends" && user.email) {
-      setFriendsLoading(true);
-      fetch(`${func2url["social"]}?action=friends&email=${encodeURIComponent(user.email)}`)
-        .then((r) => r.json())
-        .then((data) => { if (data.ok) setRealFriends(data.friends); })
-        .finally(() => setFriendsLoading(false));
-    }
-  }, [section, user.email]);
   const [notifsOn, setNotifsOn] = useState(true);
   const [notifVibration, setNotifVibration] = useState(true);
   const [showRead, setShowRead] = useState(true);
@@ -186,6 +176,16 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (section === "friends" && user.email) {
+      setFriendsLoading(true);
+      fetch(`${func2url["social"]}?action=friends&email=${encodeURIComponent(user.email)}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.ok) setRealFriends(data.friends); })
+        .finally(() => setFriendsLoading(false));
+    }
+  }, [section, user.email]);
 
   const saveEdit = () => {
     setUser(editData);
