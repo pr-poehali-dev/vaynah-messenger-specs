@@ -17,7 +17,7 @@ CORS = {
 
 
 def handler(event: dict, context) -> dict:
-    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP. v3"""
+    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP. v4"""
 
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
