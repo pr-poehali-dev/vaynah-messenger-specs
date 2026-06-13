@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 import ChatView, { ChatData } from "./ChatView";
+import GroupChatView, { GroupData, GroupMember } from "./GroupChatView";
 
 interface Chat {
   id: number;
@@ -66,9 +67,14 @@ export default function ChatsScreen({ user }: Props) {
   const [viewProfile, setViewProfile] = useState<UserProfileData | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [groupStep, setGroupStep] = useState<"members" | "setup">("members");
+  const [selectedMembers, setSelectedMembers] = useState<typeof FRIENDS>([]);
+  const [groupName, setGroupName] = useState("");
+  const [groupEmoji, setGroupEmoji] = useState("👥");
+  const [activeGroup, setActiveGroup] = useState<GroupData | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [plusMenuPos, setPlusMenuPos] = useState({ top: 0, right: 0 });
   const [toast, setToast] = useState<string | null>(null);
+  const groupPhotoRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -89,7 +95,17 @@ export default function ChatsScreen({ user }: Props) {
   const endPress = useCallback((chat: Chat, didMove: boolean) => {
     if (pressTimer.current) clearTimeout(pressTimer.current);
     if (!didMove && !menuChat) {
-      setActiveChat(chat);
+      if (chat.isGroup) {
+        setActiveGroup({
+          id: chat.id,
+          name: chat.name,
+          avatar: chat.avatar,
+          avatarColor: AVATAR_COLORS[chat.id % AVATAR_COLORS.length],
+          members: FRIENDS.slice(0, 3).map((f) => ({ id: f.id, name: f.name, surname: f.surname, avatar: f.avatar, online: f.online })),
+        });
+      } else {
+        setActiveChat(chat);
+      }
     }
   }, [menuChat]);
 
@@ -148,6 +164,11 @@ export default function ChatsScreen({ user }: Props) {
     setShowNewChat(false);
   };
 
+  // Open group chat
+  if (activeGroup) {
+    return <GroupChatView group={activeGroup} user={user} onBack={() => setActiveGroup(null)} />;
+  }
+
   // Open chat
   if (activeChat) {
     const chatData: ChatData = {
@@ -157,6 +178,222 @@ export default function ChatsScreen({ user }: Props) {
       online: activeChat.online,
     };
     return <ChatView chat={chatData} user={user} onBack={() => setActiveChat(null)} />;
+  }
+
+  // ── New group: step 1 — pick members ──────────────────────────────────────
+  if (showNewGroup && groupStep === "members") {
+    const toggle = (f: typeof FRIENDS[0]) => {
+      setSelectedMembers((prev) =>
+        prev.find((m) => m.id === f.id)
+          ? prev.filter((m) => m.id !== f.id)
+          : [...prev, f]
+      );
+    };
+    return (
+      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
+          <button onClick={() => { setShowNewGroup(false); setSelectedMembers([]); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
+            <Icon name="ArrowLeft" size={22} />
+          </button>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem" }}>Новая группа</h2>
+            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", marginTop: 1 }}>Выбери участников</p>
+          </div>
+          {selectedMembers.length > 0 && (
+            <button
+              onClick={() => setGroupStep("setup")}
+              style={{ background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "none", borderRadius: "50px", padding: "0.4rem 1rem", color: "white", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+              Далее <Icon name="ChevronRight" size={14} color="white" />
+            </button>
+          )}
+        </div>
+
+        {/* Selected preview strip */}
+        {selectedMembers.length > 0 && (
+          <div style={{ padding: "0.6rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", gap: 8, overflowX: "auto", background: "var(--vn-card)" }} className="scrollbar-hide">
+            {selectedMembers.map((m, i) => (
+              <button key={m.id} onClick={() => toggle(m)}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
+                <div style={{ position: "relative" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "0.9rem", border: "2px solid var(--vn-blue-bright)" }}>
+                    {m.avatar}
+                  </div>
+                  <div style={{ position: "absolute", top: -2, right: -2, width: 16, height: 16, borderRadius: "50%", background: "#E74C3C", border: "2px solid var(--vn-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="X" size={8} color="white" />
+                  </div>
+                </div>
+                <span style={{ fontSize: "0.6rem", color: "var(--vn-muted)", maxWidth: 42, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
+          <div style={{ padding: "0.75rem 1.2rem 0.3rem" }}>
+            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Мои друзья</p>
+          </div>
+          {FRIENDS.map((f, i) => {
+            const isSelected = !!selectedMembers.find((m) => m.id === f.id);
+            return (
+              <button
+                key={f.id}
+                onClick={() => toggle(f)}
+                style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "0.85rem 1.2rem", background: isSelected ? "rgba(33,150,243,0.06)" : "none", border: "none", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "background 0.15s", animation: `vn-appear 0.25s ease ${i * 0.04}s both` }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.08)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? "rgba(33,150,243,0.06)" : "transparent")}
+              >
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={{ width: 50, height: 50, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem", border: isSelected ? "2.5px solid var(--vn-blue-bright)" : "2px solid transparent", transition: "border 0.15s" }}>
+                    {f.avatar}
+                  </div>
+                  {f.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{f.name} {f.surname}</div>
+                  <div style={{ fontSize: "0.76rem", color: f.online ? "#2ECC71" : "var(--vn-muted)", marginTop: 2 }}>{f.online ? "онлайн" : "не в сети"}</div>
+                </div>
+                <div style={{ width: 24, height: 24, borderRadius: "50%", border: `2px solid ${isSelected ? "var(--vn-blue-bright)" : "var(--vn-border)"}`, background: isSelected ? "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                  {isSelected && <Icon name="Check" size={12} color="white" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── New group: step 2 — name & emoji ─────────────────────────────────────
+  const GROUP_EMOJIS = ["👥", "🏠", "💼", "🎮", "🌿", "🔥", "🏔", "🙏", "❤️", "⚽", "🎵", "📚", "🌙", "☕", "✈️", "🎉"];
+
+  if (showNewGroup && groupStep === "setup") {
+    const createGroup = () => {
+      if (!groupName.trim()) return;
+      const members: GroupMember[] = selectedMembers.map((f) => ({
+        id: f.id,
+        name: f.name,
+        surname: f.surname,
+        avatar: f.avatar,
+        online: f.online,
+      }));
+      const newGroupChat: Chat = {
+        id: Date.now(),
+        name: groupName.trim(),
+        avatar: groupEmoji,
+        lastMsg: `Группа создана · ${members.length + 1} участн.`,
+        time: new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }),
+        unread: 0,
+        online: false,
+        isGroup: true,
+      };
+      setChats((prev) => [newGroupChat, ...prev]);
+      const groupData: GroupData = {
+        id: newGroupChat.id,
+        name: groupName.trim(),
+        avatar: groupEmoji,
+        avatarColor: AVATAR_COLORS[newGroupChat.id % AVATAR_COLORS.length],
+        members,
+      };
+      setShowNewGroup(false);
+      setSelectedMembers([]);
+      setGroupName("");
+      setGroupEmoji("👥");
+      setGroupStep("members");
+      setActiveGroup(groupData);
+    };
+
+    return (
+      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
+          <button onClick={() => setGroupStep("members")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
+            <Icon name="ArrowLeft" size={22} />
+          </button>
+          <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem", flex: 1 }}>Настройка группы</h2>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem 1.2rem" }} className="scrollbar-hide">
+          {/* Emoji / "фото" группы */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1.5rem" }}>
+            <div style={{ position: "relative" }}>
+              <div style={{ width: 100, height: 100, borderRadius: "50%", background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3rem", boxShadow: "0 8px 28px rgba(33,150,243,0.4)", marginBottom: "0.75rem" }}>
+                {groupEmoji}
+              </div>
+              <button
+                onClick={() => groupPhotoRef.current?.click()}
+                style={{ position: "absolute", bottom: 6, right: 0, width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "2px solid var(--vn-bg)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                <Icon name="Camera" size={14} color="white" />
+              </button>
+              <input ref={groupPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={() => {}} />
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--vn-muted)" }}>Нажми на камеру — сменить фото</p>
+          </div>
+
+          {/* Emoji picker for avatar */}
+          <div style={{ marginBottom: "1.2rem" }}>
+            <label style={{ display: "block", fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.6rem" }}>
+              Эмодзи группы
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {GROUP_EMOJIS.map((em) => (
+                <button key={em} onClick={() => setGroupEmoji(em)}
+                  style={{ width: 44, height: 44, borderRadius: "0.7rem", background: groupEmoji === em ? "rgba(33,150,243,0.15)" : "var(--vn-card2)", border: `1.5px solid ${groupEmoji === em ? "var(--vn-blue-bright)" : "var(--vn-border)"}`, fontSize: "1.4rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
+                  {em}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group name */}
+          <div style={{ marginBottom: "1.2rem" }}>
+            <label style={{ display: "block", fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.5rem" }}>
+              Название группы *
+            </label>
+            <input
+              className="vn-input"
+              placeholder="Например: Семья, Работа, Друзья..."
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createGroup()}
+              autoFocus
+            />
+          </div>
+
+          {/* Members preview */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <label style={{ display: "block", fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.6rem" }}>
+              Участники ({selectedMembers.length + 1})
+            </label>
+            <div style={{ display: "flex", gap: 10, overflowX: "auto" }} className="scrollbar-hide">
+              {/* Me */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                <div style={{ width: 46, height: 46, borderRadius: "50%", background: AVATAR_COLORS[0], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem", border: "2px solid var(--vn-blue-bright)" }}>
+                  {(user.name || "Я")[0]}
+                </div>
+                <span style={{ fontSize: "0.62rem", color: "var(--vn-blue-bright)", maxWidth: 48, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Вы</span>
+              </div>
+              {selectedMembers.map((m, i) => (
+                <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: AVATAR_COLORS[(i + 1) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem" }}>
+                    {m.avatar}
+                  </div>
+                  <span style={{ fontSize: "0.62rem", color: "var(--vn-muted)", maxWidth: 48, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Create button */}
+          <button
+            className="vn-btn"
+            onClick={createGroup}
+            disabled={!groupName.trim()}
+            style={{ opacity: groupName.trim() ? 1 : 0.45, cursor: groupName.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: "1rem" }}>
+            <Icon name="Users" size={18} color="white" />
+            Создать группу
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // View profile of a person (short tap on avatar/name)
@@ -251,27 +488,42 @@ export default function ChatsScreen({ user }: Props) {
           <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem" }} className="vn-gradient-text">
             ВайНах Чаты
           </h1>
-          {/* FAB + button */}
-          <button
-            onClick={() => setShowNewChat(true)}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))",
-              border: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              boxShadow: "0 4px 16px rgba(33,150,243,0.45)",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          >
-            <Icon name="Plus" size={20} color="white" />
-          </button>
+          {/* FAB + button with dropdown */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowPlusMenu(!showPlusMenu)}
+              style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 16px rgba(33,150,243,0.45)", transition: "all 0.2s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <Icon name="Plus" size={20} color="white" />
+            </button>
+            {showPlusMenu && (
+              <>
+                <div onClick={() => setShowPlusMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                <div style={{ position: "absolute", top: 46, right: 0, background: "var(--vn-card)", border: "1px solid var(--vn-border)", borderRadius: "1rem", padding: "0.4rem", zIndex: 50, minWidth: 180, boxShadow: "0 8px 28px rgba(0,0,0,0.35)", animation: "vn-appear 0.18s ease" }}>
+                  <button onClick={() => { setShowPlusMenu(false); setShowNewChat(true); }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.75rem 0.9rem", background: "none", border: "none", cursor: "pointer", borderRadius: "0.65rem", color: "var(--vn-text)", fontSize: "0.9rem", transition: "background 0.15s" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(33,150,243,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Icon name="MessageCircle" size={16} color="var(--vn-blue-bright)" />
+                    </div>
+                    <span style={{ fontWeight: 500 }}>Личный чат</span>
+                  </button>
+                  <button onClick={() => { setShowPlusMenu(false); setSelectedMembers([]); setGroupStep("members"); setGroupName(""); setGroupEmoji("👥"); setShowNewGroup(true); }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.75rem 0.9rem", background: "none", border: "none", cursor: "pointer", borderRadius: "0.65rem", color: "var(--vn-text)", fontSize: "0.9rem", transition: "background 0.15s" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(33,150,243,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Icon name="Users" size={16} color="var(--vn-blue-bright)" />
+                    </div>
+                    <span style={{ fontWeight: 500 }}>Новая группа</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div style={{ position: "relative" }}>
