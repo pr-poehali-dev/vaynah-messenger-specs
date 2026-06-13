@@ -59,21 +59,21 @@ def handler(event: dict, context) -> dict:
     smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
     smtp_host = os.environ.get("SMTP_HOST", "smtp.mail.ru").strip()
 
-    # Безопасно читаем порт — если указан неверно, берём 465 по умолчанию
+    # Безопасно читаем порт
     try:
         smtp_port = int(os.environ.get("SMTP_PORT", "465"))
     except (ValueError, TypeError):
         smtp_port = 465
 
-    # Если SMTP не настроен — возвращаем код в ответе (режим разработки)
-    if not smtp_user or not smtp_password or "@" in os.environ.get("SMTP_PORT", ""):
+    # Если SMTP не настроен полностью — dev режим
+    if not smtp_user or not smtp_password or not smtp_host:
         return {
             "statusCode": 200,
             "headers": CORS,
             "body": json.dumps({
                 "ok": True,
                 "dev_code": code,
-                "message": "Код сгенерирован"
+                "message": "SMTP не настроен"
             })
         }
 
