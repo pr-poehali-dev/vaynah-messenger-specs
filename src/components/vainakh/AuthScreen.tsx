@@ -68,6 +68,10 @@ export default function AuthScreen({ onLogin }: Props) {
       const text = await res.text();
       let data: { ok?: boolean; error?: string; dev_code?: string } = {};
       try { data = JSON.parse(text); } catch { data = {}; }
+      if (res.status === 402) {
+        setError("Сервис временно недоступен. Обратитесь к администратору.");
+        return;
+      }
       if (data.ok) {
         setStep("code");
         setCountdown(60);
