@@ -24,6 +24,16 @@
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS COMMENT! -->
 
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS COMMENT! -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(r){ r.forEach(function(reg){ reg.unregister(); }); });
+      }
+      var BUILD = '70a3ccd';
+      if (localStorage.getItem('vn_build') !== BUILD) {
+        if (window.caches) caches.keys().then(function(k){ k.forEach(function(c){ caches.delete(c); }); });
+        localStorage.setItem('vn_build', BUILD);
+      }
+    </script>
     <script src="https://cdn.poehali.dev/intertnal/js/pp-min-2.js"></script>
     <script src="https://cdn.poehali.dev/intertnal/js/route-min.js"></script>
     <script src="https://cdn.poehali.dev/intertnal/js/telemetry-min.js"></script>
