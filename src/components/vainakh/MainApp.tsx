@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import ChatsScreen from "./ChatsScreen";
 import SearchScreen from "./SearchScreen";
@@ -6,6 +6,7 @@ import StatusesScreen from "./StatusesScreen";
 import ProfileScreen from "./ProfileScreen";
 import NotificationsScreen from "./NotificationsScreen";
 import { User, Theme } from "@/pages/Index";
+import func2url from "../../../backend/func2url.json";
 
 type Tab = "search" | "chats" | "statuses" | "profile" | "notifications";
 
@@ -19,7 +20,19 @@ interface Props {
 
 export default function MainApp({ user, setUser, onLogout, theme, toggleTheme }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("chats");
-  const [notifCount] = useState(3);
+  const [notifCount, setNotifCount] = useState(0);
+
+  useEffect(() => {
+    if (!user.email) return;
+    const check = () => {
+      fetch(`${func2url["social"]}?action=friends&email=${encodeURIComponent(user.email)}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.ok) setNotifCount(data.incoming.length); });
+    };
+    check();
+    const interval = setInterval(check, 5000);
+    return () => clearInterval(interval);
+  }, [user.email]);
 
   const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = [
     { id: "search", icon: "Search", label: "Поиск" },
@@ -35,7 +48,7 @@ export default function MainApp({ user, setUser, onLogout, theme, toggleTheme }:
         {activeTab === "search" && <SearchScreen theme={theme} toggleTheme={toggleTheme} currentUser={user} />}
         {activeTab === "chats" && <ChatsScreen user={user} />}
         {activeTab === "statuses" && <StatusesScreen user={user} />}
-        {activeTab === "notifications" && <NotificationsScreen />}
+        {activeTab === "notifications" && <NotificationsScreen user={user} />}
         {activeTab === "profile" && <ProfileScreen user={user} setUser={setUser} onLogout={onLogout} />}
       </div>
 

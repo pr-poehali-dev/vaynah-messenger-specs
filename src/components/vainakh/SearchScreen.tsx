@@ -3,7 +3,7 @@ import Icon from "@/components/ui/icon";
 import ChatView, { ChatData } from "./ChatView";
 import CallScreen from "./CallScreen";
 import CityPicker from "./CityPicker";
-import { useFriends, Person } from "./useFriends";
+
 import { User } from "@/pages/Index";
 import func2url from "../../../backend/func2url.json";
 
@@ -21,9 +21,6 @@ interface SearchUser {
   email: string;
 }
 
-function toPerson(u: SearchUser): Person {
-  return { id: u.id, name: u.name, surname: u.surname, city: u.city, age: u.age, avatar: u.avatar, online: u.online, status: u.status, mutualFriends: u.friends };
-}
 
 const avatarColors = [
   "linear-gradient(135deg,#1565C0,#2196F3)",
@@ -80,7 +77,20 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const { sendRequest, cancelRequest, removeFriend, isFriend, isPending } = useFriends();
+  const [friendIds, setFriendIds] = useState<number[]>([]);
+  const [pendingIds, setPendingIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    fetch(`${func2url["social"]}?action=friends&email=${encodeURIComponent(currentUser.email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          setFriendIds(data.friends.map((f: { id: number }) => f.id));
+          setPendingIds(data.outgoing_ids);
+        }
+      });
+  }, [currentUser?.email]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
 
@@ -92,20 +102,34 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
     return matchQ && matchCity;
   });
 
-  const handleFriendBtn = (u: SearchUser) => {
+  const isFriend = (id: number) => friendIds.includes(id);
+  const isPending = (id: number) => pendingIds.includes(id);
+
+  const handleFriendBtn = async (u: SearchUser) => {
+    if (!currentUser?.email) return;
     if (isFriend(u.id)) {
-      removeFriend(u.id);
+      await fetch(`${func2url["social"]}?action=friend`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_email: currentUser.email, to_email: u.email, fr_action: "remove" }),
+      });
+      setFriendIds((p) => p.filter((id) => id !== u.id));
       showToast("Удалён из друзей");
     } else if (isPending(u.id)) {
-      cancelRequest(u.id);
+      await fetch(`${func2url["social"]}?action=friend`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_email: currentUser.email, to_email: u.email, fr_action: "decline" }),
+      });
+      setPendingIds((p) => p.filter((id) => id !== u.id));
       showToast("Запрос отменён");
     } else {
-      sendRequest(toPerson(u));
+      await fetch(`${func2url["social"]}?action=friend`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_email: currentUser.email, to_email: u.email, fr_action: "send" }),
+      });
+      setPendingIds((p) => [...p, u.id]);
       showToast(`Запрос отправлен ${u.name}`);
     }
   };
-
-  const friendBtnLabel = (id: number) => isFriend(id) ? "✓ Друг" : isPending(id) ? "Запрос отправлен" : "+ Добавить";
 
   const blockUser = (userId: number) => {
     setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isBlocked: true } : u));
@@ -117,11 +141,11 @@ export default function SearchScreen({ theme = "dark", toggleTheme, currentUser 
   }
 
   if (openChat) {
-    return <ChatView chat={openChat} user={dummyUser} onBack={() => setOpenChat(null)} />;
+    return <ChatView chat={openChat} user={currentUser || dummyUser} onBack={() => setOpenChat(null)} />;
   }
 
   if (selectedUser) {
-    const chatData: ChatData = { id: selectedUser.id, name: `${selectedUser.name} ${selectedUser.surname}`, avatar: selectedUser.avatar, online: selectedUser.online, city: selectedUser.city, age: selectedUser.age };
+    const chatData: ChatData = { id: selectedUser.id, email: selectedUser.email, name: `${selectedUser.name} ${selectedUser.surname}`, avatar: selectedUser.avatar, online: selectedUser.online, city: selectedUser.city, age: selectedUser.age };
     const color = avatarColors[selectedUser.id % avatarColors.length];
     return (
       <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>

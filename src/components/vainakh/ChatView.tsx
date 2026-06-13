@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 import CallScreen from "./CallScreen";
+import func2url from "../../../backend/func2url.json";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ const initialMessages: Message[] = [
 
 export interface ChatData {
   id: number;
+  email?: string;
   name: string;
   avatar: string;
   online: boolean;
@@ -90,7 +92,7 @@ function extractUrl(text: string): string | null {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatView({ chat, user, onBack }: Props) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [showMedia, setShowMedia] = useState(false);
   const [activeMediaTab, setActiveMediaTab] = useState("Фото");
@@ -134,6 +136,31 @@ export default function ChatView({ chat, user, onBack }: Props) {
   const msgPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const msgPressId = useRef<number | null>(null);
 
+  const loadMessages = useCallback(() => {
+    if (!chat.email || !user.email) return;
+    fetch(`${func2url["social"]}?action=messages&my_email=${encodeURIComponent(user.email)}&other_email=${encodeURIComponent(chat.email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          const msgs: Message[] = data.messages.map((m: { id: number; from_me: boolean; text: string; time: string }) => ({
+            id: m.id,
+            text: m.text,
+            mine: m.from_me,
+            time: m.time,
+            type: "text" as const,
+            reactions: [],
+          }));
+          setMessages(msgs);
+        }
+      });
+  }, [chat.email, user.email]);
+
+  useEffect(() => {
+    loadMessages();
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
+  }, [loadMessages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -141,8 +168,15 @@ export default function ChatView({ chat, user, onBack }: Props) {
   useEffect(() => { recordSecondsRef.current = recordSeconds; }, [recordSeconds]);
 
   const pushMsg = useCallback((msg: Omit<Message, "id" | "time" | "reactions">) => {
+    if (msg.type === "text" && msg.text && chat.email && user.email) {
+      fetch(`${func2url["social"]}?action=send-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_email: user.email, to_email: chat.email, text: msg.text }),
+      }).then(() => loadMessages());
+    }
     setMessages((prev) => [...prev, { ...msg, id: Date.now(), time: getNow(), reactions: [] }]);
-  }, []);
+  }, [chat.email, user.email, loadMessages]);
 
   // ── Mic: TAP toggles mode (voice <-> video circle), HOLD records ──
   const onMicDown = useCallback((clientX: number) => {

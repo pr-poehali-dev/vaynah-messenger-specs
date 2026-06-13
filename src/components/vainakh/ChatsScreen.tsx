@@ -1,39 +1,23 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 import ChatView, { ChatData } from "./ChatView";
-import GroupChatView, { GroupData, GroupMember } from "./GroupChatView";
+import func2url from "../../../backend/func2url.json";
 
 interface Chat {
   id: number;
+  email: string;
   name: string;
+  surname: string;
   avatar: string;
   lastMsg: string;
   time: string;
   unread: number;
   online: boolean;
-  isGroup?: boolean;
+  from_me?: boolean;
   pinned?: boolean;
   muted?: boolean;
 }
-
-const INITIAL_CHATS: Chat[] = [
-  { id: 1, name: "Зайнаб Хасанова", avatar: "З", lastMsg: "Привет! Как дела? 👋", time: "14:32", unread: 2, online: true },
-  { id: 2, name: "Ислам Дудаев", avatar: "И", lastMsg: "Завтра встретимся?", time: "13:15", unread: 0, online: true },
-  { id: 3, name: "Группа Семья 🏠", avatar: "С", lastMsg: "Ахмед: Завтра приеду", time: "12:00", unread: 5, online: false, isGroup: true },
-  { id: 4, name: "Руслан Арсанов", avatar: "Р", lastMsg: "Ок, понял", time: "Вчера", unread: 0, online: false },
-  { id: 5, name: "Малика Садулаева", avatar: "М", lastMsg: "🎵 Голосовое сообщение", time: "Вчера", unread: 1, online: false },
-  { id: 6, name: "Сообщество ВайНах 🌐", avatar: "В", lastMsg: "Новости: обновление 2.0!", time: "Вт", unread: 12, online: false, isGroup: true },
-];
-
-const FRIENDS = [
-  { id: 10, name: "Зайнаб", surname: "Хасанова", avatar: "З", online: true },
-  { id: 11, name: "Ислам", surname: "Дудаев", avatar: "И", online: true },
-  { id: 12, name: "Малика", surname: "Садулаева", avatar: "М", online: false },
-  { id: 13, name: "Руслан", surname: "Арсанов", avatar: "Р", online: false },
-  { id: 14, name: "Хеда", surname: "Гайтаева", avatar: "Х", online: true },
-  { id: 15, name: "Адам", surname: "Берсанов", avatar: "А", online: false },
-];
 
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#1565C0,#2196F3)",
@@ -44,69 +28,49 @@ const AVATAR_COLORS = [
   "linear-gradient(135deg,#1565C0,#64B5F6)",
 ];
 
-interface UserProfileData {
-  id: number;
-  name: string;
-  surname?: string;
-  avatar: string;
-  online: boolean;
-  city?: string;
-}
-
 interface Props {
   user: User;
 }
 
 export default function ChatsScreen({ user }: Props) {
   const [search, setSearch] = useState("");
-  const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [menuChat, setMenuChat] = useState<Chat | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Chat | null>(null);
-  const [confirmClear, setConfirmClear] = useState<Chat | null>(null);
-  const [viewProfile, setViewProfile] = useState<UserProfileData | null>(null);
-  const [showNewChat, setShowNewChat] = useState(false);
-  const [showNewGroup, setShowNewGroup] = useState(false);
-  const [groupStep, setGroupStep] = useState<"members" | "setup">("members");
-  const [selectedMembers, setSelectedMembers] = useState<typeof FRIENDS>([]);
-  const [groupName, setGroupName] = useState("");
-  const [groupEmoji, setGroupEmoji] = useState("👥");
-  const [activeGroup, setActiveGroup] = useState<GroupData | null>(null);
-  const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const groupPhotoRef = useRef<HTMLInputElement>(null);
+
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
 
-  // Long-press detection
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pressChat = useRef<Chat | null>(null);
+  const loadChats = useCallback(() => {
+    if (!user.email) return;
+    fetch(`${func2url["social"]}?action=chats&email=${encodeURIComponent(user.email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) setChats(data.chats);
+      })
+      .finally(() => setLoading(false));
+  }, [user.email]);
+
+  useEffect(() => {
+    loadChats();
+    const interval = setInterval(loadChats, 5000);
+    return () => clearInterval(interval);
+  }, [loadChats]);
 
   const startPress = useCallback((chat: Chat) => {
-    pressChat.current = chat;
-    pressTimer.current = setTimeout(() => {
-      setMenuChat(chat);
-    }, 500);
+    pressTimer.current = setTimeout(() => setMenuChat(chat), 500);
   }, []);
 
-  const endPress = useCallback((chat: Chat, didMove: boolean) => {
+  const endPress = useCallback((chat: Chat) => {
     if (pressTimer.current) clearTimeout(pressTimer.current);
-    if (!didMove && !menuChat) {
-      if (chat.isGroup) {
-        setActiveGroup({
-          id: chat.id,
-          name: chat.name,
-          avatar: chat.avatar,
-          avatarColor: AVATAR_COLORS[chat.id % AVATAR_COLORS.length],
-          members: FRIENDS.slice(0, 3).map((f) => ({ id: f.id, name: f.name, surname: f.surname, avatar: f.avatar, online: f.online })),
-        });
-      } else {
-        setActiveChat(chat);
-      }
-    }
+    if (!menuChat) setActiveChat(chat);
   }, [menuChat]);
 
   const cancelPress = useCallback(() => {
@@ -114,643 +78,128 @@ export default function ChatsScreen({ user }: Props) {
   }, []);
 
   const sorted = [...chats]
-    .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((c) => `${c.name} ${c.surname}`.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
-  const updateChat = (id: number, patch: Partial<Chat>) =>
-    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-
-  const deleteChat = (id: number, forBoth: boolean) => {
-    setChats((prev) => prev.filter((c) => c.id !== id));
-    setConfirmDelete(null);
-    showToast(forBoth ? "Чат удалён у вас и собеседника" : "Чат удалён у вас");
-  };
-
-  const clearChat = (id: number) => {
-    updateChat(id, { lastMsg: "", unread: 0 });
-    setConfirmClear(null);
-    setMenuChat(null);
-    showToast("История чата очищена");
-  };
-
-  const pinChat = (id: number) => {
-    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)));
-    setMenuChat(null);
-  };
-
-  const muteChat = (id: number) => {
-    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, muted: !c.muted } : c)));
-    setMenuChat(null);
-  };
-
-  // Start new chat from friends list
-  const startNewChat = (friend: typeof FRIENDS[0]) => {
-    const exists = chats.find((c) => c.name === `${friend.name} ${friend.surname}`);
-    if (exists) {
-      setActiveChat(exists);
-    } else {
-      const newChat: Chat = {
-        id: Date.now(),
-        name: `${friend.name} ${friend.surname}`,
-        avatar: friend.avatar,
-        lastMsg: "",
-        time: "",
-        unread: 0,
-        online: friend.online,
-      };
-      setChats((prev) => [newChat, ...prev]);
-      setActiveChat(newChat);
-    }
-    setShowNewChat(false);
-  };
-
-  // Open group chat
-  if (activeGroup) {
-    return <GroupChatView group={activeGroup} user={user} onBack={() => setActiveGroup(null)} />;
-  }
-
-  // Open chat
   if (activeChat) {
     const chatData: ChatData = {
       id: activeChat.id,
-      name: activeChat.name,
+      email: activeChat.email,
+      name: `${activeChat.name} ${activeChat.surname}`.trim(),
       avatar: activeChat.avatar,
       online: activeChat.online,
     };
-    return <ChatView chat={chatData} user={user} onBack={() => setActiveChat(null)} />;
-  }
-
-  // ── New group: step 1 — pick members ──────────────────────────────────────
-  if (showNewGroup && groupStep === "members") {
-    const toggle = (f: typeof FRIENDS[0]) => {
-      setSelectedMembers((prev) =>
-        prev.find((m) => m.id === f.id)
-          ? prev.filter((m) => m.id !== f.id)
-          : [...prev, f]
-      );
-    };
     return (
-      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
-          <button onClick={() => { setShowNewGroup(false); setSelectedMembers([]); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
-            <Icon name="ArrowLeft" size={22} />
-          </button>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem" }}>Новая группа</h2>
-            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", marginTop: 1 }}>Выбери участников</p>
-          </div>
-          {selectedMembers.length > 0 && (
-            <button
-              onClick={() => setGroupStep("setup")}
-              style={{ background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "none", borderRadius: "50px", padding: "0.4rem 1rem", color: "white", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-              Далее <Icon name="ChevronRight" size={14} color="white" />
-            </button>
-          )}
-        </div>
-
-        {/* Selected preview strip */}
-        {selectedMembers.length > 0 && (
-          <div style={{ padding: "0.6rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", gap: 8, overflowX: "auto", background: "var(--vn-card)" }} className="scrollbar-hide">
-            {selectedMembers.map((m, i) => (
-              <button key={m.id} onClick={() => toggle(m)}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
-                <div style={{ position: "relative" }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "0.9rem", border: "2px solid var(--vn-blue-bright)" }}>
-                    {m.avatar}
-                  </div>
-                  <div style={{ position: "absolute", top: -2, right: -2, width: 16, height: 16, borderRadius: "50%", background: "#E74C3C", border: "2px solid var(--vn-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon name="X" size={8} color="white" />
-                  </div>
-                </div>
-                <span style={{ fontSize: "0.6rem", color: "var(--vn-muted)", maxWidth: 42, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-          <div style={{ padding: "0.75rem 1.2rem 0.3rem" }}>
-            <p style={{ fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Мои друзья</p>
-          </div>
-          {FRIENDS.map((f, i) => {
-            const isSelected = !!selectedMembers.find((m) => m.id === f.id);
-            return (
-              <button
-                key={f.id}
-                onClick={() => toggle(f)}
-                style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "0.85rem 1.2rem", background: isSelected ? "rgba(33,150,243,0.06)" : "none", border: "none", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "background 0.15s", animation: `vn-appear 0.25s ease ${i * 0.04}s both` }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.08)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? "rgba(33,150,243,0.06)" : "transparent")}
-              >
-                <div style={{ position: "relative", flexShrink: 0 }}>
-                  <div style={{ width: 50, height: 50, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem", border: isSelected ? "2.5px solid var(--vn-blue-bright)" : "2px solid transparent", transition: "border 0.15s" }}>
-                    {f.avatar}
-                  </div>
-                  {f.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
-                </div>
-                <div style={{ flex: 1, textAlign: "left" }}>
-                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{f.name} {f.surname}</div>
-                  <div style={{ fontSize: "0.76rem", color: f.online ? "#2ECC71" : "var(--vn-muted)", marginTop: 2 }}>{f.online ? "онлайн" : "не в сети"}</div>
-                </div>
-                <div style={{ width: 24, height: 24, borderRadius: "50%", border: `2px solid ${isSelected ? "var(--vn-blue-bright)" : "var(--vn-border)"}`, background: isSelected ? "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                  {isSelected && <Icon name="Check" size={12} color="white" />}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ── New group: step 2 — name & emoji ─────────────────────────────────────
-  const GROUP_EMOJIS = ["👥", "🏠", "💼", "🎮", "🌿", "🔥", "🏔", "🙏", "❤️", "⚽", "🎵", "📚", "🌙", "☕", "✈️", "🎉"];
-
-  if (showNewGroup && groupStep === "setup") {
-    const createGroup = () => {
-      if (!groupName.trim()) return;
-      const members: GroupMember[] = selectedMembers.map((f) => ({
-        id: f.id,
-        name: f.name,
-        surname: f.surname,
-        avatar: f.avatar,
-        online: f.online,
-      }));
-      const newGroupChat: Chat = {
-        id: Date.now(),
-        name: groupName.trim(),
-        avatar: groupEmoji,
-        lastMsg: `Группа создана · ${members.length + 1} участн.`,
-        time: new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }),
-        unread: 0,
-        online: false,
-        isGroup: true,
-      };
-      setChats((prev) => [newGroupChat, ...prev]);
-      const groupData: GroupData = {
-        id: newGroupChat.id,
-        name: groupName.trim(),
-        avatar: groupEmoji,
-        avatarColor: AVATAR_COLORS[newGroupChat.id % AVATAR_COLORS.length],
-        members,
-      };
-      setShowNewGroup(false);
-      setSelectedMembers([]);
-      setGroupName("");
-      setGroupEmoji("👥");
-      setGroupStep("members");
-      setActiveGroup(groupData);
-    };
-
-    return (
-      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
-          <button onClick={() => setGroupStep("members")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
-            <Icon name="ArrowLeft" size={22} />
-          </button>
-          <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem", flex: 1 }}>Настройка группы</h2>
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem 1.2rem" }} className="scrollbar-hide">
-          {/* Emoji / "фото" группы */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1.5rem" }}>
-            <div style={{ position: "relative" }}>
-              <div style={{ width: 100, height: 100, borderRadius: "50%", background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3rem", boxShadow: "0 8px 28px rgba(33,150,243,0.4)", marginBottom: "0.75rem" }}>
-                {groupEmoji}
-              </div>
-              <button
-                onClick={() => groupPhotoRef.current?.click()}
-                style={{ position: "absolute", bottom: 6, right: 0, width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "2px solid var(--vn-bg)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <Icon name="Camera" size={14} color="white" />
-              </button>
-              <input ref={groupPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={() => {}} />
-            </div>
-            <p style={{ fontSize: "0.78rem", color: "var(--vn-muted)" }}>Нажми на камеру — сменить фото</p>
-          </div>
-
-          {/* Emoji picker for avatar */}
-          <div style={{ marginBottom: "1.2rem" }}>
-            <label style={{ display: "block", fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.6rem" }}>
-              Эмодзи группы
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {GROUP_EMOJIS.map((em) => (
-                <button key={em} onClick={() => setGroupEmoji(em)}
-                  style={{ width: 44, height: 44, borderRadius: "0.7rem", background: groupEmoji === em ? "rgba(33,150,243,0.15)" : "var(--vn-card2)", border: `1.5px solid ${groupEmoji === em ? "var(--vn-blue-bright)" : "var(--vn-border)"}`, fontSize: "1.4rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
-                  {em}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Group name */}
-          <div style={{ marginBottom: "1.2rem" }}>
-            <label style={{ display: "block", fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.5rem" }}>
-              Название группы *
-            </label>
-            <input
-              className="vn-input"
-              placeholder="Например: Семья, Работа, Друзья..."
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createGroup()}
-              autoFocus
-            />
-          </div>
-
-          {/* Members preview */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ display: "block", fontSize: "0.72rem", color: "var(--vn-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.6rem" }}>
-              Участники ({selectedMembers.length + 1})
-            </label>
-            <div style={{ display: "flex", gap: 10, overflowX: "auto" }} className="scrollbar-hide">
-              {/* Me */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                <div style={{ width: 46, height: 46, borderRadius: "50%", background: AVATAR_COLORS[0], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem", border: "2px solid var(--vn-blue-bright)" }}>
-                  {(user.name || "Я")[0]}
-                </div>
-                <span style={{ fontSize: "0.62rem", color: "var(--vn-blue-bright)", maxWidth: 48, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Вы</span>
-              </div>
-              {selectedMembers.map((m, i) => (
-                <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: AVATAR_COLORS[(i + 1) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1rem" }}>
-                    {m.avatar}
-                  </div>
-                  <span style={{ fontSize: "0.62rem", color: "var(--vn-muted)", maxWidth: 48, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Create button */}
-          <button
-            className="vn-btn"
-            onClick={createGroup}
-            disabled={!groupName.trim()}
-            style={{ opacity: groupName.trim() ? 1 : 0.45, cursor: groupName.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: "1rem" }}>
-            <Icon name="Users" size={18} color="white" />
-            Создать группу
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // View profile of a person (short tap on avatar/name)
-  if (viewProfile) {
-    const chatData: ChatData = {
-      id: viewProfile.id,
-      name: `${viewProfile.name}${viewProfile.surname ? " " + viewProfile.surname : ""}`,
-      avatar: viewProfile.avatar,
-      online: viewProfile.online,
-      city: viewProfile.city,
-    };
-    return (
-      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-        <div style={{ padding: "0.9rem 1rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
-          <button onClick={() => setViewProfile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
-            <Icon name="ArrowLeft" size={22} />
-          </button>
-          <span style={{ fontWeight: 600 }}>Профиль</span>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-          <div style={{ height: 130, background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light),var(--vn-blue-bright))", position: "relative" }} />
-          <div style={{ padding: "0 1.2rem 1.2rem", position: "relative" }}>
-            <div style={{ marginTop: -44, width: 88, height: 88, borderRadius: "50%", background: AVATAR_COLORS[viewProfile.id % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "2rem", color: "white", border: "4px solid var(--vn-bg)", position: "relative", marginBottom: "0.75rem" }}>
-              {viewProfile.avatar}
-              {viewProfile.online && <div className="vn-online" style={{ position: "absolute", bottom: 4, right: 4, width: 14, height: 14 }} />}
-            </div>
-            <h2 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.4rem", marginBottom: 4 }}>{viewProfile.name}{viewProfile.surname ? " " + viewProfile.surname : ""}</h2>
-            <p style={{ color: viewProfile.online ? "#2ECC71" : "var(--vn-muted)", fontSize: "0.84rem", marginBottom: "1.2rem" }}>
-              {viewProfile.online ? "🟢 онлайн" : "⚫ не в сети"}{viewProfile.city ? " · " + viewProfile.city : ""}
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
-              <button
-                onClick={() => { setViewProfile(null); const c = chats.find(ch => ch.id === viewProfile.id); if (c) setActiveChat(c); else { const nc: Chat = { id: viewProfile.id, name: `${viewProfile.name}${viewProfile.surname ? " " + viewProfile.surname : ""}`, avatar: viewProfile.avatar, lastMsg: "", time: "", unread: 0, online: viewProfile.online }; setChats(p => [nc, ...p]); setActiveChat(nc); } }}
-                className="vn-btn"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0.75rem", fontSize: "0.9rem" }}
-              >
-                <Icon name="MessageCircle" size={16} color="white" />Написать
-              </button>
-              <button className="vn-btn" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0.75rem", fontSize: "0.9rem", background: "linear-gradient(135deg,var(--vn-blue-mid),var(--vn-blue-bright))" }}>
-                <Icon name="Phone" size={16} color="white" />Позвонить
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // New chat — pick friend
-  if (showNewChat) {
-    return (
-      <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-        <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", display: "flex", alignItems: "center", gap: 12, background: "var(--vn-card)" }}>
-          <button onClick={() => setShowNewChat(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-blue-bright)" }}>
-            <Icon name="ArrowLeft" size={22} />
-          </button>
-          <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem", flex: 1 }}>Новая беседа</h2>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-          <div style={{ padding: "0.75rem 1.2rem 0.3rem" }}>
-            <p style={{ fontSize: "0.75rem", color: "var(--vn-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Выберите собеседника</p>
-          </div>
-          {FRIENDS.map((f, i) => (
-            <button
-              key={f.id}
-              onClick={() => startNewChat(f)}
-              style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "0.9rem 1.2rem", background: "none", border: "none", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "background 0.15s", animation: `vn-appear 0.25s ease ${i * 0.05}s both` }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.06)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>{f.avatar}</div>
-                {f.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
-              </div>
-              <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{f.name} {f.surname}</div>
-                <div style={{ fontSize: "0.76rem", color: f.online ? "#2ECC71" : "var(--vn-muted)", marginTop: 2 }}>{f.online ? "онлайн" : "не в сети"}</div>
-              </div>
-              <Icon name="ChevronRight" size={16} color="var(--vn-muted)" />
-            </button>
-          ))}
-        </div>
-      </div>
+      <ChatView
+        chat={chatData}
+        user={user}
+        onBack={() => { setActiveChat(null); loadChats(); }}
+      />
     );
   }
 
   return (
     <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ padding: "1.2rem 1.2rem 0.8rem", borderBottom: "1px solid var(--vn-border)" }}>
+      <div style={{ padding: "1rem 1.2rem 0.8rem", borderBottom: "1px solid var(--vn-border)", background: "var(--vn-card)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8rem" }}>
-          <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem" }} className="vn-gradient-text">
-            ВайНах Чаты
-          </h1>
-          {/* FAB + button with dropdown */}
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => setShowPlusMenu(!showPlusMenu)}
-              style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 16px rgba(33,150,243,0.45)", transition: "all 0.2s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              <Icon name="Plus" size={20} color="white" />
-            </button>
-            {showPlusMenu && (
-              <>
-                <div onClick={() => setShowPlusMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <div style={{ position: "absolute", top: 46, right: 0, background: "var(--vn-card)", border: "1px solid var(--vn-border)", borderRadius: "1rem", padding: "0.4rem", zIndex: 50, minWidth: 180, boxShadow: "0 8px 28px rgba(0,0,0,0.35)", animation: "vn-appear 0.18s ease" }}>
-                  <button onClick={() => { setShowPlusMenu(false); setShowNewChat(true); }}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.75rem 0.9rem", background: "none", border: "none", cursor: "pointer", borderRadius: "0.65rem", color: "var(--vn-text)", fontSize: "0.9rem", transition: "background 0.15s" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.08)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(33,150,243,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Icon name="MessageCircle" size={16} color="var(--vn-blue-bright)" />
-                    </div>
-                    <span style={{ fontWeight: 500 }}>Личный чат</span>
-                  </button>
-                  <button onClick={() => { setShowPlusMenu(false); setSelectedMembers([]); setGroupStep("members"); setGroupName(""); setGroupEmoji("👥"); setShowNewGroup(true); }}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.75rem 0.9rem", background: "none", border: "none", cursor: "pointer", borderRadius: "0.65rem", color: "var(--vn-text)", fontSize: "0.9rem", transition: "background 0.15s" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.08)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(33,150,243,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Icon name="Users" size={16} color="var(--vn-blue-bright)" />
-                    </div>
-                    <span style={{ fontWeight: 500 }}>Новая группа</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem" }} className="vn-gradient-text">Чаты</h1>
+          <button onClick={loadChats} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--vn-muted)" }}>
+            <Icon name="RefreshCw" size={18} />
+          </button>
         </div>
-
         <div style={{ position: "relative" }}>
           <Icon name="Search" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-          <input
-            className="vn-input"
-            placeholder="Поиск по чатам"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingLeft: "2.5rem" }}
-          />
+          <input className="vn-input" placeholder="Поиск чатов" value={search} onChange={(e) => setSearch(e.target.value)} style={{ paddingLeft: "2.4rem", fontSize: "0.9rem" }} />
         </div>
       </div>
 
-      {/* Chat list */}
+      {/* List */}
       <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-        {sorted.map((chat, i) => {
-          let pressStarted = false;
-          let moved = false;
-
-          return (
-            <div
-              key={chat.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.9rem",
-                padding: "0.75rem 1.2rem",
-                cursor: "pointer",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                transition: "background 0.15s",
-                position: "relative",
-                animation: `vn-appear 0.3s ease ${i * 0.04}s both`,
-                background: chat.pinned ? "rgba(33,150,243,0.04)" : "transparent",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = chat.pinned ? "rgba(33,150,243,0.09)" : "rgba(33,150,243,0.05)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = chat.pinned ? "rgba(33,150,243,0.04)" : "transparent")}
-              onPointerDown={() => { pressStarted = true; moved = false; startPress(chat); }}
-              onPointerMove={() => { if (pressStarted) { moved = true; cancelPress(); } }}
-              onPointerUp={() => { if (!moved) endPress(chat, false); pressStarted = false; }}
-              onPointerCancel={cancelPress}
-              onContextMenu={(e) => { e.preventDefault(); setMenuChat(chat); }}
-            >
-              {/* Pin indicator */}
-              {chat.pinned && (
-                <div style={{ position: "absolute", top: 6, right: 8 }}>
-                  <Icon name="Pin" size={11} color="var(--vn-blue-bright)" />
-                </div>
-              )}
-
-              {/* Avatar — short tap → profile */}
-              <div
-                style={{ position: "relative", flexShrink: 0 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (pressTimer.current) clearTimeout(pressTimer.current);
-                  setViewProfile({ id: chat.id, name: chat.name, avatar: chat.avatar, online: chat.online });
-                }}
-              >
-                <div style={{ width: 50, height: 50, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.1rem", color: "white" }}>
-                  {chat.avatar}
-                </div>
-                {chat.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+            <Icon name="Loader" size={28} color="var(--vn-muted)" />
+            <p style={{ marginTop: "0.8rem", fontSize: "0.9rem" }}>Загружаем чаты...</p>
+          </div>
+        ) : sorted.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+            <Icon name="MessageCircle" size={48} color="var(--vn-muted)" />
+            <p style={{ marginTop: "1rem", fontWeight: 600 }}>Нет чатов</p>
+            <p style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>Найди людей в разделе Поиск и напиши им</p>
+          </div>
+        ) : sorted.map((chat, i) => (
+          <div
+            key={chat.id}
+            style={{ display: "flex", alignItems: "center", gap: "0.9rem", padding: "0.75rem 1.2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", cursor: "pointer", transition: "background 0.15s", userSelect: "none" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.05)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            onMouseDown={() => startPress(chat)}
+            onMouseUp={() => endPress(chat)}
+            onMouseMove={cancelPress}
+            onTouchStart={() => startPress(chat)}
+            onTouchEnd={() => endPress(chat)}
+            onTouchMove={cancelPress}
+          >
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1.2rem", color: "white" }}>
+                {chat.avatar}
               </div>
-
-              {/* Name + last message — click → open chat */}
-              <div
-                style={{ flex: 1, minWidth: 0 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (pressTimer.current) clearTimeout(pressTimer.current);
-                  setActiveChat(chat);
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600, fontSize: "0.95rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
-                    {chat.name}
-                    {chat.muted && <Icon name="BellOff" size={12} color="var(--vn-muted)" />}
-                  </span>
-                  <span style={{ fontSize: "0.75rem", color: "var(--vn-muted)", flexShrink: 0, marginLeft: 8 }}>{chat.time}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "0.82rem", color: "var(--vn-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                    {chat.lastMsg}
-                  </span>
-                  {chat.unread > 0 && !chat.muted && (
-                    <div style={{ background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", color: "white", borderRadius: "50px", minWidth: 20, height: 20, fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 8, flexShrink: 0 }}>
-                      {chat.unread}
-                    </div>
-                  )}
-                  {chat.unread > 0 && chat.muted && (
-                    <div style={{ background: "var(--vn-border)", color: "var(--vn-muted)", borderRadius: "50px", minWidth: 20, height: 20, fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 8, flexShrink: 0 }}>
-                      {chat.unread}
-                    </div>
-                  )}
-                </div>
+              {chat.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{chat.name} {chat.surname}</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--vn-muted)", flexShrink: 0, marginLeft: 8 }}>{chat.time}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+                <span style={{ fontSize: "0.82rem", color: "var(--vn-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "75%" }}>
+                  {chat.from_me ? "Вы: " : ""}{chat.lastMsg}
+                </span>
+                {chat.unread > 0 && (
+                  <div style={{ minWidth: 20, height: 20, borderRadius: 10, background: "var(--vn-blue)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 700, color: "white", padding: "0 5px", flexShrink: 0 }}>
+                    {chat.unread}
+                  </div>
+                )}
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
-      {/* Long-press context menu */}
+      {/* Context menu */}
       {menuChat && (
-        <div
-          onClick={() => setMenuChat(null)}
-          style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 50, display: "flex", alignItems: "flex-end" }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--vn-card)", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.2rem 1rem 1.5rem", width: "100%", animation: "vn-appear 0.22s cubic-bezier(0.34,1.56,0.64,1)" }}
-          >
-            {/* Chat preview */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "1rem", paddingBottom: "0.9rem", borderBottom: "1px solid var(--vn-border)" }}>
-              <div style={{ width: 46, height: 46, borderRadius: "50%", background: AVATAR_COLORS[chats.indexOf(menuChat) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
-                {menuChat.avatar}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{menuChat.name}</div>
-                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)" }}>{menuChat.lastMsg || "Нет сообщений"}</div>
-              </div>
-            </div>
-
-            {/* Actions */}
+        <div style={{ position: "fixed", inset: 0, zIndex: 100 }} onClick={() => setMenuChat(null)}>
+          <div style={{ position: "absolute", bottom: 80, left: "50%", transform: "translateX(-50%)", background: "var(--vn-card)", border: "1px solid var(--vn-border)", borderRadius: "1rem", overflow: "hidden", minWidth: 220 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: "1rem 1.2rem", borderBottom: "1px solid var(--vn-border)", fontWeight: 600 }}>{menuChat.name} {menuChat.surname}</div>
             {[
-              { icon: menuChat.pinned ? "PinOff" : "Pin", label: menuChat.pinned ? "Открепить" : "Закрепить", action: () => pinChat(menuChat.id), color: "var(--vn-blue-bright)" },
-              { icon: menuChat.muted ? "Bell" : "BellOff", label: menuChat.muted ? "Включить звук" : "Отключить звук", action: () => muteChat(menuChat.id), color: "var(--vn-blue-bright)" },
-              { icon: "Eraser", label: "Очистить чат", action: () => { setConfirmClear(menuChat); setMenuChat(null); }, color: "var(--vn-muted)" },
-              { icon: "Trash2", label: "Удалить чат", action: () => { setConfirmDelete(menuChat); setMenuChat(null); }, color: "#E74C3C" },
+              { icon: "Pin", label: menuChat.pinned ? "Открепить" : "Закрепить", action: () => { setChats((p) => p.map((c) => c.id === menuChat.id ? { ...c, pinned: !c.pinned } : c)); setMenuChat(null); } },
+              { icon: "Trash2", label: "Удалить чат", action: () => { setConfirmDelete(menuChat); setMenuChat(null); }, danger: true },
             ].map((item) => (
-              <button
-                key={item.label}
-                onClick={item.action}
-                style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", background: "none", border: "none", padding: "0.85rem 0.5rem", cursor: "pointer", borderRadius: "0.75rem", transition: "background 0.15s" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(33,150,243,0.06)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              >
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: item.color === "#E74C3C" ? "rgba(231,76,60,0.1)" : "rgba(33,150,243,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon name={item.icon} size={17} color={item.color} />
-                </div>
-                <span style={{ fontSize: "0.95rem", color: item.color === "#E74C3C" ? "#E74C3C" : "var(--vn-text)", fontWeight: item.color === "#E74C3C" ? 600 : 400 }}>{item.label}</span>
+              <button key={item.label} onClick={item.action} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "0.85rem 1.2rem", background: "none", border: "none", cursor: "pointer", color: item.danger ? "#E74C3C" : "var(--vn-text)", fontSize: "0.9rem" }}>
+                <Icon name={item.icon} size={17} color={item.danger ? "#E74C3C" : "var(--vn-muted)"} />
+                {item.label}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── Confirm CLEAR ── */}
-      {confirmClear && (
-        <div onClick={() => setConfirmClear(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--vn-card)", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.5rem", width: "100%", animation: "vn-appear 0.2s ease" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.75rem" }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: AVATAR_COLORS[chats.findIndex((c) => c.id === confirmClear.id) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
-                {confirmClear.avatar}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{confirmClear.name}</div>
-              </div>
-            </div>
-            <h3 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>Очистить историю чата?</h3>
-            <p style={{ color: "var(--vn-muted)", fontSize: "0.85rem", marginBottom: "1.2rem" }}>
-              Все сообщения исчезнут только у вас. У собеседника переписка останется.
-            </p>
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button onClick={() => setConfirmClear(null)} style={{ flex: 1, background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.85rem", color: "var(--vn-text)", cursor: "pointer", fontWeight: 600, fontSize: "0.9rem" }}>
-                Отмена
-              </button>
-              <button onClick={() => clearChat(confirmClear.id)} style={{ flex: 1, background: "linear-gradient(135deg,var(--vn-blue),var(--vn-blue-light))", border: "none", borderRadius: "0.75rem", padding: "0.85rem", color: "white", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem" }}>
-                Очистить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Confirm DELETE ── */}
+      {/* Confirm delete */}
       {confirmDelete && (
-        <div onClick={() => setConfirmDelete(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--vn-card)", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.5rem", width: "100%", animation: "vn-appear 0.2s ease" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.75rem" }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: AVATAR_COLORS[chats.findIndex((c) => c.id === confirmDelete.id) % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem" }}>
-                {confirmDelete.avatar}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700 }}>{confirmDelete.name}</div>
-              </div>
-            </div>
-            <h3 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>Удалить чат?</h3>
-            <p style={{ color: "var(--vn-muted)", fontSize: "0.85rem", marginBottom: "1.2rem" }}>
-              Вернуть нельзя. Выберите, у кого удалить переписку.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-              <button
-                onClick={() => deleteChat(confirmDelete.id, false)}
-                style={{ width: "100%", background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.75rem", padding: "0.85rem", color: "var(--vn-text)", cursor: "pointer", fontWeight: 500, fontSize: "0.9rem", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-              >
-                <Icon name="User" size={16} color="var(--vn-muted)" />
-                Удалить только у меня
-              </button>
-              <button
-                onClick={() => deleteChat(confirmDelete.id, true)}
-                style={{ width: "100%", background: "rgba(231,76,60,0.1)", border: "1px solid rgba(231,76,60,0.35)", borderRadius: "0.75rem", padding: "0.85rem", color: "#E74C3C", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-              >
-                <Icon name="Users" size={16} color="#E74C3C" />
-                Удалить у всех участников
-              </button>
-              <button onClick={() => setConfirmDelete(null)} style={{ width: "100%", background: "none", border: "none", padding: "0.6rem", color: "var(--vn-muted)", cursor: "pointer", fontSize: "0.9rem" }}>
-                Отмена
-              </button>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ background: "var(--vn-card)", borderRadius: "1rem", padding: "1.5rem", maxWidth: 320, width: "100%" }}>
+            <h3 style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Удалить чат?</h3>
+            <p style={{ color: "var(--vn-muted)", fontSize: "0.88rem", marginBottom: "1.2rem" }}>Сообщения будут удалены только у вас.</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "0.7rem", background: "var(--vn-card2)", border: "1px solid var(--vn-border)", borderRadius: "0.6rem", color: "var(--vn-text)", cursor: "pointer" }}>Отмена</button>
+              <button onClick={() => { setChats((p) => p.filter((c) => c.id !== confirmDelete.id)); setConfirmDelete(null); showToast("Чат удалён"); }} style={{ flex: 1, padding: "0.7rem", background: "#E74C3C", border: "none", borderRadius: "0.6rem", color: "white", cursor: "pointer", fontWeight: 600 }}>Удалить</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Toast ── */}
       {toast && (
-        <div style={{
-          position: "absolute", bottom: 80, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(13,22,38,0.95)", color: "var(--vn-text)",
-          borderRadius: "50px", padding: "0.55rem 1.2rem",
-          fontSize: "0.82rem", fontWeight: 500, zIndex: 70,
-          border: "1px solid var(--vn-border)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-          animation: "vn-appear 0.2s ease",
-          whiteSpace: "nowrap",
-          backdropFilter: "blur(12px)",
-        }}>
+        <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", background: "var(--vn-card)", border: "1px solid var(--vn-border)", borderRadius: "50px", padding: "0.5rem 1.2rem", fontSize: "0.85rem", zIndex: 300, whiteSpace: "nowrap" }}>
           {toast}
         </div>
       )}
