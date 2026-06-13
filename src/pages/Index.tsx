@@ -101,7 +101,8 @@ export default function Index() {
               setLoginEmail(email);
               const u = { ...defaultUser, ...userData, email };
               setUser(u);
-              if (userData?.name) {
+              const isRegistered = !!(userData?.name && userData.name.trim() && userData?.surname && userData.surname.trim());
+              if (isRegistered) {
                 setScreen("app");
                 saveSession(u, "app");
               } else {
