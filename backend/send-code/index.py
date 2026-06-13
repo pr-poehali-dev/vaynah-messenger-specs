@@ -4,9 +4,7 @@ import smtplib
 import json
 import ssl
 import psycopg2
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formatdate
+from email.message import EmailMessage
 from datetime import datetime, timedelta
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p48581099_vaynah_messenger_spe")
@@ -19,7 +17,7 @@ CORS = {
 
 
 def handler(event: dict, context) -> dict:
-    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP. v2"""
+    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP. v3"""
 
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
@@ -55,32 +53,27 @@ def handler(event: dict, context) -> dict:
     smtp_user = os.environ.get("SMTP_USER", "").strip()
     smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
 
-    html_body = f"""
+    msg = EmailMessage()
+    msg["Subject"] = "Ваш код для входа в ВайНах"
+    msg["From"] = smtp_user
+    msg["To"] = email
+    msg.set_content(f"Ваш код для входа в ВайНах: {code}\nКод действителен 10 минут.")
+    msg.add_alternative(f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0D1626; border-radius: 16px;">
-      <h1 style="color: #42A5F5; font-size: 24px; margin-bottom: 8px;">🏔 ВайНах</h1>
+      <h1 style="color: #42A5F5; font-size: 24px; margin-bottom: 8px;">ВайНах</h1>
       <p style="color: #8080AA; font-size: 14px; margin-bottom: 32px;">Мессенджер твоего народа</p>
       <p style="color: #E8F0FE; font-size: 16px; margin-bottom: 16px;">Ваш код для входа:</p>
       <div style="background: #1A2D4A; border: 1px solid #2196F3; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
         <span style="color: #42A5F5; font-size: 40px; font-weight: 900; letter-spacing: 12px;">{code}</span>
       </div>
       <p style="color: #5C7CA0; font-size: 13px;">Код действителен 10 минут. Никому его не сообщайте.</p>
-      <p style="color: #5C7CA0; font-size: 12px; margin-top: 24px;">Если вы не запрашивали вход — просто проигнорируйте это письмо.</p>
     </div>
-    """
-
-    msg = MIMEMultipart("alternative")
-    msg["Date"] = formatdate(localtime=True)
-    msg["Subject"] = "Ваш код для входа в ВайНах"
-    msg["From"] = smtp_user
-    msg["To"] = email
-    msg["Message-ID"] = f"<{code}.{int(datetime.utcnow().timestamp())}@mail.ru>"
-    msg.attach(MIMEText(f"Ваш код для входа в ВайНах: {code}\nКод действителен 10 минут.", "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    """, subtype="html")
 
     context_ssl = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.mail.ru", 465, context=context_ssl, timeout=15) as server:
         server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, email, msg.as_string())
+        server.send_message(msg)
 
     print(f"Код отправлен на {email}")
     return {
