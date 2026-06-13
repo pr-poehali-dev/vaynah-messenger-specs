@@ -350,23 +350,107 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"""
                 SELECT s.id, s.type, s.content, s.file_url, s.color, s.emoji, s.created_at,
-                       u.id, u.name, u.surname, u.avatar_url
+                       u.id, u.name, u.surname, u.avatar_url, s.group_id,
+                       (SELECT COUNT(*) FROM {SCHEMA}.status_views sv WHERE sv.status_id = s.id) as view_count
                 FROM {SCHEMA}.statuses s
                 JOIN {SCHEMA}.users u ON s.user_id = u.id
                 WHERE s.expires_at > NOW() {block_clause}
                 ORDER BY s.created_at DESC
-                LIMIT 50
+                LIMIT 100
             """)
             rows = cur.fetchall()
             statuses = [{
                 "id": r[0], "type": r[1], "content": r[2], "file_url": r[3],
                 "color": r[4], "emoji": r[5], "time": r[6].strftime("%H:%M"),
                 "user_id": r[7], "user_name": r[8] or "", "user_surname": r[9] or "",
-                "avatar_url": r[10],
+                "avatar_url": r[10], "group_id": r[11],
                 "avatar": (r[8] or "?")[0].upper(),
                 "is_mine": my_id_for_block is not None and r[7] == my_id_for_block,
+                "view_count": r[12],
             } for r in rows]
             return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True, "statuses": statuses})}
+
+        # POST /social?action=view-status  — отмечаем просмотр
+        elif method == "POST" and action == "view-status":
+            body = json.loads(event.get("body") or "{}")
+            email = (body.get("email") or "").strip().lower()
+            status_id = int(body.get("status_id") or 0)
+            viewer_id = get_user_id(cur, email)
+            if viewer_id and status_id:
+                cur.execute(f"""
+                    INSERT INTO {SCHEMA}.status_views (status_id, viewer_id)
+                    VALUES (%s, %s) ON CONFLICT DO NOTHING
+                """, (status_id, viewer_id))
+                conn.commit()
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True})}
+
+        # GET /social?action=status-views&status_id=...&email=...
+        elif method == "GET" and action == "status-views":
+            status_id = int(params.get("status_id") or 0)
+            email = (params.get("email") or "").strip().lower()
+            my_id = get_user_id(cur, email)
+            # Только автор может смотреть список просмотров
+            cur.execute(f"SELECT user_id FROM {SCHEMA}.statuses WHERE id = %s", (status_id,))
+            row = cur.fetchone()
+            if not row or row[0] != my_id:
+                return {"statusCode": 403, "headers": CORS, "body": json.dumps({"error": "Нет доступа"})}
+
+            cur.execute(f"""
+                SELECT u.id, u.name, u.surname, u.avatar_url, sv.viewed_at
+                FROM {SCHEMA}.status_views sv
+                JOIN {SCHEMA}.users u ON sv.viewer_id = u.id
+                WHERE sv.status_id = %s
+                ORDER BY sv.viewed_at DESC
+            """, (status_id,))
+            viewers = [{
+                "id": r[0], "name": r[1] or "", "surname": r[2] or "",
+                "avatar_url": r[3] or "", "avatar": (r[1] or "?")[0].upper(),
+                "time": r[4].strftime("%H:%M"),
+            } for r in cur.fetchall()]
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True, "viewers": viewers})}
+
+        # POST /social?action=delete-status
+        elif method == "POST" and action == "delete-status":
+            body = json.loads(event.get("body") or "{}")
+            email = (body.get("email") or "").strip().lower()
+            status_id = int(body.get("status_id") or 0)
+            my_id = get_user_id(cur, email)
+            if my_id and status_id:
+                cur.execute(f"UPDATE {SCHEMA}.statuses SET expires_at = NOW() WHERE id = %s AND user_id = %s", (status_id, my_id))
+                conn.commit()
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True})}
+
+        # GET /social?action=mutual-friends&my_email=...&other_email=...
+        elif method == "GET" and action == "mutual-friends":
+            my_email = (params.get("my_email") or "").strip().lower()
+            other_email = (params.get("other_email") or "").strip().lower()
+            my_id = get_user_id(cur, my_email)
+            other_id = get_user_id(cur, other_email)
+            if not my_id or not other_id:
+                return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True, "mutual": []})}
+
+            cur.execute(f"""
+                SELECT u.id, u.name, u.surname, u.avatar_url, u.last_seen
+                FROM {SCHEMA}.users u
+                WHERE u.id IN (
+                    SELECT CASE WHEN f.from_user_id = %s THEN f.to_user_id ELSE f.from_user_id END
+                    FROM {SCHEMA}.friendships f
+                    WHERE (f.from_user_id = %s OR f.to_user_id = %s) AND f.status = 'accepted'
+                )
+                AND u.id IN (
+                    SELECT CASE WHEN f.from_user_id = %s THEN f.to_user_id ELSE f.from_user_id END
+                    FROM {SCHEMA}.friendships f
+                    WHERE (f.from_user_id = %s OR f.to_user_id = %s) AND f.status = 'accepted'
+                )
+                LIMIT 10
+            """, (my_id, my_id, my_id, other_id, other_id, other_id))
+            mutual = [{
+                "id": r[0], "name": r[1] or "", "surname": r[2] or "",
+                "avatar_url": r[3] or "", "avatar": (r[1] or "?")[0].upper(),
+                "online": is_online(r[4]),
+                "email": "",
+            } for r in cur.fetchall()]
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True, "mutual": mutual})}
 
         # POST /social?action=upload  (аватар или статус)
         elif method == "POST" and action == "upload":

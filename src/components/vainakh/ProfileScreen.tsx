@@ -37,6 +37,17 @@ interface OtherProfile {
   birthdate: string;
   online: boolean;
   isFriend: boolean;
+  email?: string;
+}
+
+interface MutualFriend {
+  id: number;
+  name: string;
+  surname: string;
+  avatar: string;
+  avatar_url?: string;
+  online: boolean;
+  email: string;
 }
 
 const RUSSIA_REGIONS = [
@@ -178,6 +189,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [regionSearch, setRegionSearch] = useState("");
   const [otherProfile, setOtherProfile] = useState<OtherProfile | null>(null);
   const [profileIdx, setProfileIdx] = useState(0);
+  const [mutualFriends, setMutualFriends] = useState<MutualFriend[]>([]);
   const [friendStates, setFriendStates] = useState<Record<number, boolean>>({});
   const [openChat, setOpenChat] = useState<ChatData | null>(null);
   const [openCall, setOpenCall] = useState<{ type: "audio" | "video"; chat: ChatData } | null>(null);
@@ -206,6 +218,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
 
   const openOtherProfile = (f: RealFriend, idx: number = 0) => {
     setProfileIdx(idx);
+    setMutualFriends([]);
     setOtherProfile({
       name: f.name,
       surname: f.surname,
@@ -215,8 +228,15 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
       birthdate: "",
       online: f.online,
       isFriend: true,
+      email: f.email,
     });
     setSection("other-profile");
+    // Грузим общих друзей
+    if (user.email && f.email) {
+      fetch(`${func2url["social"]}?action=mutual-friends&my_email=${encodeURIComponent(user.email)}&other_email=${encodeURIComponent(f.email)}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.ok) setMutualFriends(data.mutual); });
+    }
   };
 
   const filteredRegions = RUSSIA_REGIONS.filter((r) =>
@@ -461,12 +481,12 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   // ── OTHER PROFILE ──
   if (section === "other-profile" && otherProfile) {
     const age = calcAge(otherProfile.birthdate);
-    const mutualFriends: RealFriend[] = [];
     const isFriendNow = otherProfile.isFriend;
 
     const toggleFriend = () => {
-      const fId = -1;
-      setFriendStates((prev) => ({ ...prev, [fId]: !prev[fId] }));
+      const fId = otherProfile.email || "x";
+      const wasF = friendStates[fId as unknown as number] ?? isFriendNow;
+      setFriendStates((prev) => ({ ...prev, [fId as unknown as number]: !wasF }));
     };
 
     return (
@@ -699,11 +719,14 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
             >
               Общие друзья
             </p>
+            {mutualFriends.length === 0 && (
+              <p style={{ fontSize: "0.85rem", color: "var(--vn-muted)" }}>Нет общих друзей</p>
+            )}
             <div style={{ display: "flex", gap: 14 }}>
               {mutualFriends.map((f, i) => (
                 <button
                   key={f.id}
-                  onClick={() => openOtherProfile(f)}
+                  onClick={() => openOtherProfile({ ...f, city: "", online: f.online } as RealFriend, i)}
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -722,7 +745,7 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                         width: 52,
                         height: 52,
                         borderRadius: "50%",
-                        background: avatarGrads[i % avatarGrads.length],
+                        background: f.avatar_url?.startsWith("http") ? "none" : avatarGrads[i % avatarGrads.length],
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -730,9 +753,12 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
                         color: "white",
                         fontSize: "1rem",
                         border: "2px solid var(--vn-border)",
+                        overflow: "hidden",
                       }}
                     >
-                      {f.avatar}
+                      {f.avatar_url?.startsWith("http")
+                        ? <img src={f.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : f.avatar}
                     </div>
                     {f.online && (
                       <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />
