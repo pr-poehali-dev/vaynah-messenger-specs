@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
-import func2url from "@/api";
+
+const SEND_CODE_URL = "https://functions.poehali.dev/c1f8d36c-2ba1-49e0-bfea-545f50e5dcab";
+const VERIFY_CODE_URL = "https://functions.poehali.dev/85f5bb79-a714-446f-9464-9b2413b7d5cc";
 
 interface UserData {
   id?: number;
@@ -58,7 +60,7 @@ export default function AuthScreen({ onLogin }: Props) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(func2url["send-code"], {
+      const res = await fetch(SEND_CODE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
@@ -90,7 +92,7 @@ export default function AuthScreen({ onLogin }: Props) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(func2url["verify-code"], {
+      const res = await fetch(VERIFY_CODE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), code: fullCode }),
@@ -129,7 +131,7 @@ export default function AuthScreen({ onLogin }: Props) {
       setTimeout(async () => {
         setLoading(true);
         try {
-          const res = await fetch(func2url["verify-code"], {
+          const res = await fetch(VERIFY_CODE_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: email.trim().toLowerCase(), code: fullCode }),
