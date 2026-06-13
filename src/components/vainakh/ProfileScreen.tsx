@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { User } from "@/pages/Index";
 import ChatView, { ChatData } from "./ChatView";
 import CallScreen from "./CallScreen";
 import CityPicker from "./CityPicker";
+import func2url from "../../../backend/func2url.json";
 
 interface Props {
   user: User;
@@ -123,14 +124,15 @@ const RUSSIA_REGIONS = [
   "Ямало-Ненецкий автономный округ",
 ];
 
-const mockFriends = [
-  { id: 1, name: "Зайнаб", surname: "Хасанова", avatar: "З", city: "Грозный", online: true, status: "На прогулке", birthdate: "1998-04-15", isFriend: true },
-  { id: 2, name: "Ислам", surname: "Дудаев", avatar: "И", city: "Гудермес", online: true, status: "Работаю", birthdate: "1995-07-22", isFriend: true },
-  { id: 3, name: "Малика", surname: "Садулаева", avatar: "М", city: "Грозный", online: false, status: "Добрый день всем!", birthdate: "2000-01-10", isFriend: true },
-  { id: 4, name: "Руслан", surname: "Арсанов", avatar: "Р", city: "Шали", online: false, status: "", birthdate: "1993-11-03", isFriend: true },
-  { id: 5, name: "Хеда", surname: "Гайтаева", avatar: "Х", city: "Аргун", online: true, status: "Алхамдулиллах", birthdate: "1997-06-28", isFriend: true },
-  { id: 6, name: "Адам", surname: "Берсанов", avatar: "А", city: "Грозный", online: false, status: "В пути", birthdate: "1991-09-17", isFriend: true },
-];
+interface RealFriend {
+  id: number;
+  name: string;
+  surname: string;
+  avatar: string;
+  city: string;
+  email: string;
+  online: boolean;
+}
 
 const avatarGrads = [
   "linear-gradient(135deg,#1565C0,#2196F3)",
@@ -157,6 +159,18 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
   const [hidePhone, setHidePhone] = useState(false);
   const [hideOnline, setHideOnline] = useState(false);
   const [hideLastSeen, setHideLastSeen] = useState(false);
+  const [realFriends, setRealFriends] = useState<RealFriend[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+
+  useEffect(() => {
+    if (section === "friends" && user.email) {
+      setFriendsLoading(true);
+      fetch(`${func2url["social"]}?action=friends&email=${encodeURIComponent(user.email)}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.ok) setRealFriends(data.friends); })
+        .finally(() => setFriendsLoading(false));
+    }
+  }, [section, user.email]);
   const [notifsOn, setNotifsOn] = useState(true);
   const [notifVibration, setNotifVibration] = useState(true);
   const [showRead, setShowRead] = useState(true);
@@ -343,100 +357,34 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
           <h2 style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "1.1rem", flex: 1 }}>
             Мои друзья
           </h2>
-          <span style={{ fontSize: "0.8rem", color: "var(--vn-muted)" }}>{mockFriends.length}</span>
+          <span style={{ fontSize: "0.8rem", color: "var(--vn-muted)" }}>{realFriends.length}</span>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }} className="scrollbar-hide">
-          {mockFriends.map((f, i) => (
+          {friendsLoading ? (
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--vn-muted)" }}>
+              <Icon name="Loader" size={28} color="var(--vn-muted)" />
+              <p style={{ marginTop: "0.8rem", fontSize: "0.9rem" }}>Загружаем...</p>
+            </div>
+          ) : realFriends.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "4rem 1.5rem", color: "var(--vn-muted)" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>👥</div>
+              <p style={{ fontWeight: 600 }}>Нет друзей</p>
+              <p style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>Найди людей в разделе Поиск</p>
+            </div>
+          ) : realFriends.map((f, i) => (
             <div
               key={f.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "0.9rem 1.2rem",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                animation: `vn-appear 0.3s ease ${i * 0.06}s both`,
-                cursor: "pointer",
-              }}
-              onClick={() => openOtherProfile(f)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.9rem 1.2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", animation: `vn-appear 0.3s ease ${i * 0.06}s both`, cursor: "pointer" }}
             >
               <div style={{ position: "relative", flexShrink: 0 }}>
-                <div
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: "50%",
-                    background: avatarGrads[i % avatarGrads.length],
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    color: "white",
-                    fontSize: "1.1rem",
-                    boxShadow: "0 4px 12px rgba(33,150,243,0.25)",
-                  }}
-                >
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: avatarGrads[i % avatarGrads.length], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "white", fontSize: "1.1rem", boxShadow: "0 4px 12px rgba(33,150,243,0.25)" }}>
                   {f.avatar}
                 </div>
-                {f.online && (
-                  <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />
-                )}
+                {f.online && <div className="vn-online" style={{ position: "absolute", bottom: 1, right: 1 }} />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>
-                  {f.name} {f.surname}
-                </div>
-                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>
-                  {f.city}
-                </div>
-                {f.status && (
-                  <div
-                    style={{
-                      fontSize: "0.78rem",
-                      color: "var(--vn-blue-bright)",
-                      marginTop: 2,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {f.status}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); }}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: "50%",
-                    background: "rgba(33,150,243,0.1)",
-                    border: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon name="MessageCircle" size={15} color="var(--vn-blue-bright)" />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); }}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: "50%",
-                    background: "rgba(33,150,243,0.1)",
-                    border: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon name="Phone" size={15} color="var(--vn-blue-bright)" />
-                </button>
+                <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{f.name} {f.surname}</div>
+                <div style={{ fontSize: "0.76rem", color: "var(--vn-muted)", marginTop: 2 }}>{f.city}</div>
               </div>
             </div>
           ))}
