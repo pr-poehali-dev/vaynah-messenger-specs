@@ -1,9 +1,11 @@
 import os
 import random
+import smtplib
 import json
-import urllib.request
-import urllib.parse
+import ssl
 import psycopg2
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p48581099_vaynah_messenger_spe")
@@ -16,7 +18,7 @@ CORS = {
 
 
 def handler(event: dict, context) -> dict:
-    """Отправляет 4-значный одноразовый код на email пользователя через Unisender API."""
+    """Отправляет 4-значный одноразовый код на email пользователя через Mail.ru SMTP."""
 
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
@@ -49,8 +51,8 @@ def handler(event: dict, context) -> dict:
         cur.close()
         conn.close()
 
-    api_key = os.environ.get("UNISENDER_API_KEY", "").strip()
-    sender_email = os.environ.get("SMTP_USER", "").strip()
+    smtp_user = os.environ.get("SMTP_USER", "").strip()
+    smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
 
     html_body = f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0D1626; border-radius: 16px;">
@@ -65,35 +67,19 @@ def handler(event: dict, context) -> dict:
     </div>
     """
 
-    params = urllib.parse.urlencode({
-        "api_key": api_key,
-        "format": "json",
-        "email": email,
-        "sender_name": "ВайНах",
-        "sender_email": sender_email,
-        "subject": "Ваш код для входа в ВайНах",
-        "body": f"Ваш код для входа в ВайНах: {code}\nКод действителен 10 минут.",
-        "list_id": "1",
-    }).encode("utf-8")
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Ваш код для входа в ВайНах"
+    msg["From"] = f"ВайНах <{smtp_user}>"
+    msg["To"] = email
+    msg.attach(MIMEText(f"Ваш код для входа в ВайНах: {code}\nКод действителен 10 минут.", "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    req = urllib.request.Request(
-        "https://api.unisender.com/ru/api/sendEmail",
-        data=params,
-        method="POST"
-    )
+    context_ssl = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.mail.ru", 465, context=context_ssl, timeout=15) as server:
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, email, msg.as_string())
 
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
-
-    print(f"Unisender response: {result}")
-
-    if "error" in result:
-        return {
-            "statusCode": 500,
-            "headers": CORS,
-            "body": json.dumps({"error": f"Ошибка Unisender: {result['error']}"})
-        }
-
+    print(f"Код отправлен на {email}")
     return {
         "statusCode": 200,
         "headers": CORS,
