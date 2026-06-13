@@ -101,15 +101,17 @@ def handler(event: dict, context) -> dict:
         msg.attach(MIMEText(text_body, "plain", "utf-8"))
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
+        import ssl
+        context_ssl = ssl.create_default_context()
         if smtp_port == 465:
-            import ssl
-            context_ssl = ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context_ssl) as server:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context_ssl, timeout=10) as server:
                 server.login(smtp_user, smtp_password)
                 server.sendmail(smtp_user, email, msg.as_string())
         else:
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.ehlo()
+                server.starttls(context=context_ssl)
+                server.ehlo()
                 server.login(smtp_user, smtp_password)
                 server.sendmail(smtp_user, email, msg.as_string())
 
@@ -120,13 +122,11 @@ def handler(event: dict, context) -> dict:
         }
 
     except Exception as e:
-        # Если SMTP не работает, возвращаем код для отладки
+        print(f"SMTP ERROR: {type(e).__name__}: {str(e)}")
         return {
-            "statusCode": 200,
+            "statusCode": 500,
             "headers": CORS,
             "body": json.dumps({
-                "ok": True,
-                "dev_code": code,
-                "message": f"Ошибка SMTP: {str(e)[:100]}"
+                "error": f"Ошибка отправки: {str(e)[:200]}"
             })
         }
