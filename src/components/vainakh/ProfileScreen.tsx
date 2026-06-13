@@ -1929,7 +1929,6 @@ export default function ProfileScreen({ user, setUser, onLogout }: Props) {
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         style={{ display: "none" }}
         onChange={() => {}}
       />

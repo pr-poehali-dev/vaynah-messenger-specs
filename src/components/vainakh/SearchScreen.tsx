@@ -47,7 +47,12 @@ const avatarColors = [
 
 const dummyUser: User = { email: "", name: "", surname: "", city: "", phone: "", birthdate: "", about: "", avatar: "", online: true };
 
-export default function SearchScreen() {
+interface Props {
+  theme?: "dark" | "light";
+  toggleTheme?: () => void;
+}
+
+export default function SearchScreen({ theme = "dark", toggleTheme }: Props) {
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -194,7 +199,28 @@ export default function SearchScreen() {
     <div className="vn-screen" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Header + filters */}
       <div style={{ padding: "1.2rem 1.2rem 0.8rem", borderBottom: "1px solid var(--vn-border)" }}>
-        <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem", marginBottom: "0.9rem" }} className="vn-gradient-text">ВайНах Поиск</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.9rem" }}>
+          <h1 style={{ fontFamily: "Montserrat", fontWeight: 800, fontSize: "1.3rem" }} className="vn-gradient-text">ВайНах Поиск</h1>
+          {toggleTheme && (
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+              style={{
+                width: 38, height: 38, borderRadius: "50%",
+                background: "var(--vn-card2)",
+                border: "1px solid var(--vn-border)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", transition: "all 0.25s",
+                fontSize: "1.15rem", flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1) rotate(15deg)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1) rotate(0deg)")}
+            >
+              {theme === "dark" ? "🌙" : "☀️"}
+            </button>
+          )}
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
           <div style={{ position: "relative" }}>
             <Icon name="Search" size={16} color="var(--vn-muted)" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />

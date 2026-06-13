@@ -5,7 +5,7 @@ import SearchScreen from "./SearchScreen";
 import StatusesScreen from "./StatusesScreen";
 import ProfileScreen from "./ProfileScreen";
 import NotificationsScreen from "./NotificationsScreen";
-import { User } from "@/pages/Index";
+import { User, Theme } from "@/pages/Index";
 
 type Tab = "search" | "chats" | "statuses" | "profile" | "notifications";
 
@@ -13,9 +13,11 @@ interface Props {
   user: User;
   setUser: (u: User) => void;
   onLogout?: () => void;
+  theme: Theme;
+  toggleTheme: () => void;
 }
 
-export default function MainApp({ user, setUser, onLogout }: Props) {
+export default function MainApp({ user, setUser, onLogout, theme, toggleTheme }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("chats");
   const [notifCount] = useState(3);
 
@@ -30,7 +32,7 @@ export default function MainApp({ user, setUser, onLogout }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        {activeTab === "search" && <SearchScreen />}
+        {activeTab === "search" && <SearchScreen theme={theme} toggleTheme={toggleTheme} />}
         {activeTab === "chats" && <ChatsScreen user={user} />}
         {activeTab === "statuses" && <StatusesScreen user={user} />}
         {activeTab === "notifications" && <NotificationsScreen />}
@@ -84,11 +86,7 @@ export default function MainApp({ user, setUser, onLogout }: Props) {
                   transition: "all 0.2s",
                 }}
               >
-                <Icon
-                  name={tab.icon}
-                  size={18}
-                  color={isActive ? "white" : "var(--vn-muted)"}
-                />
+                <Icon name={tab.icon} size={18} color={isActive ? "white" : "var(--vn-muted)"} />
                 {tab.badge && tab.badge > 0 && (
                   <div
                     style={{

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthScreen from "@/components/vainakh/AuthScreen";
 import RegisterScreen from "@/components/vainakh/RegisterScreen";
 import MainApp from "@/components/vainakh/MainApp";
@@ -35,6 +35,15 @@ export default function Index() {
   const [screen, setScreen] = useState<AppScreen>("auth");
   const [user, setUser] = useState<User>(defaultUser);
   const [loginEmail, setLoginEmail] = useState("");
+  const [theme, setTheme] = useState<Theme>("dark");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "light") root.classList.add("theme-light");
+    else root.classList.remove("theme-light");
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   return (
     <div
@@ -78,6 +87,8 @@ export default function Index() {
           <MainApp
             user={user}
             setUser={setUser}
+            theme={theme}
+            toggleTheme={toggleTheme}
             onLogout={() => {
               setScreen("auth");
               setUser({ ...defaultUser });
