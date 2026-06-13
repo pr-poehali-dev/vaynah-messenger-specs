@@ -16,6 +16,7 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
   const [surname, setSurname] = useState("");
   const [birthdate, setBirthdate] = useState("");
   const [city, setCity] = useState("");
+  const [about, setAbout] = useState("");
   const [check1, setCheck1] = useState(false);
   const [check2, setCheck2] = useState(false);
   const [check3, setCheck3] = useState(false);
@@ -31,14 +32,14 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
       await fetch(func2url["update-profile"], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim() }),
+        body: JSON.stringify({ email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim(), about: about.trim() }),
       });
     } catch {
       // Продолжаем даже при ошибке сети — данные сохранены локально
     } finally {
       setLoading(false);
     }
-    setUser({ ...user, email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim() });
+    setUser({ ...user, email, name: name.trim(), surname: surname.trim(), birthdate, city: city.trim(), about: about.trim() });
     onContinue();
   };
 
@@ -141,6 +142,21 @@ export default function RegisterScreen({ onContinue, user, setUser, email }: Pro
               </span>
               <Icon name="ChevronDown" size={16} color="var(--vn-muted)" />
             </button>
+          </div>
+
+          {/* About */}
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--vn-muted)", marginBottom: "0.35rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              О себе
+            </label>
+            <textarea
+              className="vn-input"
+              placeholder="Несколько слов о себе..."
+              value={about}
+              onChange={(e) => setAbout(e.target.value)}
+              rows={3}
+              style={{ resize: "none", fontSize: "0.9rem" }}
+            />
           </div>
 
           {/* Checkboxes */}
