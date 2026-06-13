@@ -11,7 +11,7 @@ import func2url from "../../../backend/func2url.json";
 class TabBoundary extends Component<{ name: string; children: ReactNode }, { err: string | null }> {
   constructor(p: { name: string; children: ReactNode }) { super(p); this.state = { err: null }; }
   static getDerivedStateFromError(e: Error) { return { err: e.message }; }
-  componentDidCatch(e: Error) { console.error("TAB CRASH [" + this.props.name + "]:", e.message, e.stack); }
+  componentDidCatch(e: Error, info: React.ErrorInfo) { console.error("TAB CRASH [" + this.props.name + "]:", e.message, "\nSTACK:", e.stack, "\nCOMPONENT:", info.componentStack); }
   render() {
     if (this.state.err) return (
       <div style={{ padding: "2rem", color: "#E74C3C", fontSize: "0.85rem" }}>
