@@ -45,21 +45,11 @@ export default function MainApp({ user, setUser, onLogout, theme, toggleTheme }:
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        <div style={{ display: activeTab === "search" ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-          <SearchScreen theme={theme} toggleTheme={toggleTheme} currentUser={user} />
-        </div>
-        <div style={{ display: activeTab === "chats" ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-          <ChatsScreen user={user} />
-        </div>
-        <div style={{ display: activeTab === "statuses" ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-          <StatusesScreen user={user} />
-        </div>
-        <div style={{ display: activeTab === "notifications" ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-          <NotificationsScreen user={user} />
-        </div>
-        <div style={{ display: activeTab === "profile" ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-          <ProfileScreen user={user} setUser={setUser} onLogout={onLogout} />
-        </div>
+        {activeTab === "search" && <SearchScreen theme={theme} toggleTheme={toggleTheme} currentUser={user} />}
+        {activeTab === "chats" && <ChatsScreen user={user} />}
+        {activeTab === "statuses" && <StatusesScreen user={user} />}
+        {activeTab === "notifications" && <NotificationsScreen user={user} />}
+        {activeTab === "profile" && <ProfileScreen user={user} setUser={setUser} onLogout={onLogout} />}
       </div>
 
       {/* Bottom Navigation */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component, ReactNode } from "react";
 import AuthScreen from "@/components/vainakh/AuthScreen";
 import RegisterScreen from "@/components/vainakh/RegisterScreen";
 import MainApp from "@/components/vainakh/MainApp";
@@ -38,8 +38,11 @@ function loadSession(): { user: User; screen: AppScreen } | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user?.email) return null;
+    return parsed;
   } catch {
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
@@ -50,6 +53,38 @@ function saveSession(user: User, screen: AppScreen) {
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+}
+
+// ErrorBoundary — ловит краш и показывает кнопку сброса вместо чёрного экрана
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  handleReset() {
+    clearSession();
+    window.location.reload();
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", background: "#0D1626", color: "white", padding: "2rem", textAlign: "center" }}>
+          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⚠️</div>
+          <p style={{ fontSize: "1rem", marginBottom: "1.5rem", color: "#8080AA" }}>Что-то пошло не так. Нажми кнопку ниже чтобы перезагрузить.</p>
+          <button
+            onClick={() => this.handleReset()}
+            style={{ background: "linear-gradient(135deg,#1565C0,#42A5F5)", border: "none", borderRadius: "0.75rem", padding: "0.8rem 2rem", color: "white", fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
+          >
+            Перезагрузить
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function Index() {
@@ -65,7 +100,6 @@ export default function Index() {
     else root.classList.remove("theme-light");
   }, [theme]);
 
-  // Сохраняем сессию при каждом изменении
   useEffect(() => {
     if (screen === "app" && user.email) {
       saveSession(user, screen);
@@ -75,73 +109,74 @@ export default function Index() {
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 430,
-        height: "100dvh",
-        position: "relative",
-        overflow: "hidden",
-        background: "var(--vn-bg)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* Ambient orbs */}
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
-        <div style={{ position: "absolute", top: -120, right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(33,150,243,0.12) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", bottom: 80, left: -120, width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(21,101,192,0.1) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", top: "35%", left: "30%", width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.07) 0%, transparent 70%)" }} />
-      </div>
+    <ErrorBoundary>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 430,
+          height: "100dvh",
+          position: "relative",
+          overflow: "hidden",
+          background: "var(--vn-bg)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
+          <div style={{ position: "absolute", top: -120, right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(33,150,243,0.12) 0%, transparent 70%)" }} />
+          <div style={{ position: "absolute", bottom: 80, left: -120, width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(21,101,192,0.1) 0%, transparent 70%)" }} />
+          <div style={{ position: "absolute", top: "35%", left: "30%", width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.07) 0%, transparent 70%)" }} />
+        </div>
 
-      <div style={{ position: "relative", zIndex: 1, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {screen === "auth" && (
-          <AuthScreen
-            onLogin={(email, userData) => {
-              setLoginEmail(email);
-              const u = { ...defaultUser, ...userData, email };
-              setUser(u);
-              const isRegistered = !!(userData?.name && userData.name.trim() && userData?.surname && userData.surname.trim());
-              if (isRegistered) {
+        <div style={{ position: "relative", zIndex: 1, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {screen === "auth" && (
+            <AuthScreen
+              onLogin={(email, userData) => {
+                setLoginEmail(email);
+                const u = { ...defaultUser, ...userData, email };
+                setUser(u);
+                const isRegistered = !!(userData?.name && userData.name.trim() && userData?.surname && userData.surname.trim());
+                if (isRegistered) {
+                  setScreen("app");
+                  saveSession(u, "app");
+                } else {
+                  setScreen("register");
+                }
+              }}
+            />
+          )}
+          {screen === "register" && (
+            <RegisterScreen
+              onContinue={(userData) => {
+                const u = { ...user, ...userData };
+                setUser(u);
                 setScreen("app");
                 saveSession(u, "app");
-              } else {
-                setScreen("register");
-              }
-            }}
-          />
-        )}
-        {screen === "register" && (
-          <RegisterScreen
-            onContinue={(userData) => {
-              const u = { ...user, ...userData };
-              setUser(u);
-              setScreen("app");
-              saveSession(u, "app");
-            }}
-            user={user}
-            setUser={setUser}
-            email={loginEmail}
-          />
-        )}
-        {screen === "app" && (
-          <MainApp
-            user={user}
-            setUser={(u) => {
-              setUser(u);
-              saveSession(u, "app");
-            }}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            onLogout={() => {
-              clearSession();
-              setScreen("auth");
-              setUser({ ...defaultUser });
-              setLoginEmail("");
-            }}
-          />
-        )}
+              }}
+              user={user}
+              setUser={setUser}
+              email={loginEmail}
+            />
+          )}
+          {screen === "app" && (
+            <MainApp
+              user={user}
+              setUser={(u) => {
+                setUser(u);
+                saveSession(u, "app");
+              }}
+              theme={theme}
+              toggleTheme={toggleTheme}
+              onLogout={() => {
+                clearSession();
+                setScreen("auth");
+                setUser({ ...defaultUser });
+                setLoginEmail("");
+              }}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

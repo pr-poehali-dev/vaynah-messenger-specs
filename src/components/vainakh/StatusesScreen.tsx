@@ -28,12 +28,7 @@ const STATUS_COLORS = [
   "linear-gradient(160deg,#263238,#455A64)",
 ];
 
-const mockStatuses: Status[] = [
-  { id: 1, user: "Зайнаб", avatar: "З", type: "text", content: "Алхамдулиллах за всё! 🌿", time: "15 мин", viewed: false, emoji: "🙏", reactions: { "❤️": 5, "🙏": 3 } },
-  { id: 2, user: "Ислам", avatar: "И", type: "photo", content: "Горы Кавказа", time: "1 ч", viewed: false, reactions: { "🔥": 8, "😍": 2 } },
-  { id: 3, user: "Малика", avatar: "М", type: "text", content: "Хороший день ☀️", time: "2 ч", viewed: true, reactions: { "😊": 4 } },
-  { id: 4, user: "Руслан", avatar: "Р", type: "audio", content: "Голосовое 0:45", time: "3 ч", viewed: true, reactions: {} },
-];
+const mockStatuses: Status[] = [];
 
 const avatarColors = [
   "linear-gradient(135deg, #1565C0, #2196F3)",
